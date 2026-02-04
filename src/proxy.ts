@@ -25,7 +25,7 @@ import { logUsage, type UsageEntry } from "./logger.js";
 
 const BLOCKRUN_API = "https://blockrun.ai/api";
 const AUTO_MODEL = "blockrun/auto";
-const USER_AGENT = "claw-router/0.1.0";
+const USER_AGENT = "clawrouter/0.2.0";
 
 export type ProxyOptions = {
   walletKey: string;

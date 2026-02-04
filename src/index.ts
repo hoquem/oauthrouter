@@ -29,10 +29,10 @@ import { resolveOrGenerateWalletKey } from "./auth.js";
 import type { RoutingConfig } from "./router/index.js";
 
 const plugin: OpenClawPluginDefinition = {
-  id: "claw-router",
+  id: "clawrouter",
   name: "ClawRouter",
-  description: "Smart LLM router — 30+ models, x402 micropayments, 63% cost savings",
-  version: "0.1.0",
+  description: "Smart LLM router — 30+ models, x402 micropayments, 78% cost savings",
+  version: "0.2.0",
 
   register(api: OpenClawPluginApi) {
     // Register BlockRun as a provider
