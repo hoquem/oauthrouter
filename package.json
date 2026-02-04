@@ -38,7 +38,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/BlockRunAI/claw-router"
+    "url": "git+https://github.com/BlockRunAI/claw-router.git"
   },
   "dependencies": {
     "@x402/evm": "^2.2.0",
