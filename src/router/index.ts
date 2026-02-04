@@ -2,37 +2,35 @@
  * Smart Router Entry Point
  *
  * Classifies requests and routes to the cheapest capable model.
- * Uses hybrid approach: rules first (< 1ms), LLM fallback for ambiguous cases.
+ * 100% local — rules-based scoring handles all requests in <1ms.
+ * Ambiguous cases default to configurable tier (MEDIUM by default).
  */
 
 import type { Tier, RoutingDecision, RoutingConfig } from "./types.js";
 import { classifyByRules } from "./rules.js";
-import { classifyByLLM } from "./llm-classifier.js";
 import { selectModel, getFallbackChain, type ModelPricing } from "./selector.js";
 
 export type RouterOptions = {
   config: RoutingConfig;
   modelPricing: Map<string, ModelPricing>;
-  payFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-  apiBase: string;
 };
 
 /**
  * Route a request to the cheapest capable model.
  *
  * 1. Check overrides (large context, structured output)
- * 2. Run rule-based classifier
- * 3. If ambiguous, run LLM classifier
+ * 2. Run rule-based classifier (14 weighted dimensions, <1ms)
+ * 3. If ambiguous, default to configurable tier (no external API calls)
  * 4. Select model for tier
  * 5. Return RoutingDecision with metadata
  */
-export async function route(
+export function route(
   prompt: string,
   systemPrompt: string | undefined,
   maxOutputTokens: number,
   options: RouterOptions,
-): Promise<RoutingDecision> {
-  const { config, modelPricing, payFetch, apiBase } = options;
+): RoutingDecision {
+  const { config, modelPricing } = options;
 
   // Estimate input tokens (~4 chars per token)
   const fullText = `${systemPrompt ?? ""} ${prompt}`;
@@ -74,24 +72,10 @@ export async function route(
     tier = ruleResult.tier;
     confidence = ruleResult.confidence;
   } else {
-    // Ambiguous — LLM classifier fallback
-    const llmResult = await classifyByLLM(
-      prompt,
-      {
-        model: config.classifier.llmModel,
-        maxTokens: config.classifier.llmMaxTokens,
-        temperature: config.classifier.llmTemperature,
-        truncationChars: config.classifier.promptTruncationChars,
-        cacheTtlMs: config.classifier.cacheTtlMs,
-      },
-      payFetch,
-      apiBase,
-    );
-
-    tier = llmResult.tier;
-    confidence = llmResult.confidence;
-    method = "llm";
-    reasoning += ` | ambiguous -> LLM: ${tier}`;
+    // Ambiguous — default to configurable tier (no external API call)
+    tier = config.overrides.ambiguousDefaultTier;
+    confidence = 0.5;
+    reasoning += ` | ambiguous -> default: ${tier}`;
   }
 
   // Apply structured output minimum tier

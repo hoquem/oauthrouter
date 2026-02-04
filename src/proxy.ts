@@ -32,7 +32,7 @@ import { RequestDeduplicator, type CachedResponse } from "./dedup.js";
 
 const BLOCKRUN_API = "https://blockrun.ai/api";
 const AUTO_MODEL = "blockrun/auto";
-const USER_AGENT = "clawrouter/0.3.0";
+const USER_AGENT = "clawrouter/0.3.1";
 const HEARTBEAT_INTERVAL_MS = 2_000;
 
 export type ProxyOptions = {
@@ -112,14 +112,12 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   const account = privateKeyToAccount(options.walletKey as `0x${string}`);
   const { fetch: payFetch, cache: paymentCache } = createPaymentFetch(options.walletKey as `0x${string}`);
 
-  // Build router options (pass the new payFetch signature — it accepts preAuth as 3rd arg)
+  // Build router options (100% local — no external API calls for routing)
   const routingConfig = mergeRoutingConfig(options.routingConfig);
   const modelPricing = buildModelPricing();
   const routerOpts: RouterOptions = {
     config: routingConfig,
     modelPricing,
-    payFetch: (input, init) => payFetch(input, init), // router doesn't need preAuth
-    apiBase,
   };
 
   // Request deduplicator (shared across all requests)
@@ -243,7 +241,7 @@ async function proxyRequest(
         const prompt = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
         const systemPrompt = typeof systemMsg?.content === "string" ? systemMsg.content : undefined;
 
-        routingDecision = await route(prompt, systemPrompt, maxTokens, routerOpts);
+        routingDecision = route(prompt, systemPrompt, maxTokens, routerOpts);
 
         // Replace model in body
         parsed.model = routingDecision.model;

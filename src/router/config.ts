@@ -123,5 +123,6 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
   overrides: {
     maxTokensForceComplex: 100_000,
     structuredOutputMinTier: "MEDIUM",
+    ambiguousDefaultTier: "MEDIUM",
   },
 };

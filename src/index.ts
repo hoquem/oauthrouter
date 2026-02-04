@@ -69,7 +69,7 @@ const plugin: OpenClawPluginDefinition = {
   id: "clawrouter",
   name: "ClawRouter",
   description: "Smart LLM router — 30+ models, x402 micropayments, 78% cost savings",
-  version: "0.3.0",
+  version: "0.3.1",
 
   register(api: OpenClawPluginApi) {
     // Register BlockRun as a provider (sync — available immediately)
