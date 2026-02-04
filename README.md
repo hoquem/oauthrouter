@@ -51,7 +51,6 @@ openclaw config set model blockrun/auto
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │  @blockrun/openclaw provider plugin                       │  │
 │  │  • Intercepts LLM requests                                │  │
-│  │  • Checks spend limits                                    │  │
 │  │  • Forwards to BlockRun API                               │  │
 │  │  • Handles x402 micropayment                               │  │
 │  │  • Streams response back                                  │  │
@@ -121,35 +120,94 @@ Already have a funded wallet? Set it directly:
 export BLOCKRUN_WALLET_KEY=0x...your_private_key...
 ```
 
-### How Payment Works
+### How Pricing Works
 
-The plugin handles x402 micropayments transparently. Each API call pays only for what it uses:
+Each request is priced upfront based on input tokens (known) + estimated max output tokens:
 
 ```
-Request → 402 (price: $0.002) → sign USDC → retry with payment → stream response
+Price = (input_tokens × input_rate) + (max_output_tokens × output_rate)
+```
+
+The `max_output_tokens` comes from your request's `max_tokens` parameter (or the model's default). You pay for the worst case — if the actual response is shorter, the difference covers BlockRun's operating costs. No hidden fees, no surprise charges. The price is shown in the 402 response before your wallet signs anything.
+
+### How Payment Works
+
+The plugin handles x402 micropayments transparently:
+
+```
+Request → 402 (price: $0.003) → sign USDC → retry with payment → stream response
 ```
 
 No signup, no dashboard, no credit card. Your wallet balance IS your account.
 
+### Wallet Security
+
+**Auto-generated wallets** are encrypted with a password and saved to `~/.openclaw/blockrun.keystore` (Foundry-style encrypted keystore). You'll be prompted for a password on first run. Set `BLOCKRUN_KEYSTORE_PASSWORD` env var for unattended operation.
+
+**Bring-your-own wallets** via `BLOCKRUN_WALLET_KEY` are stored in plaintext — this is your responsibility to secure. For production, prefer the encrypted keystore or a hardware wallet.
+
 ## Spend Controls
+
+Two layers of protection:
+
+1. **Wallet balance** — hard ceiling enforced by the blockchain. You can't spend more USDC than you have.
+2. **Operator budgets** — configurable limits enforced server-side by BlockRun API per wallet address. Prevents a runaway agent from draining your wallet.
 
 ```yaml
 # openclaw.yaml
 plugins:
   - id: "@blockrun/openclaw"
     config:
-      # Hard budget limits (requests blocked when exceeded)
+      # Budget limits (enforced server-side by BlockRun API)
       dailyBudget: "5.00"      # Max $5/day
       monthlyBudget: "50.00"   # Max $50/month
 
       # Per-request limits
       maxCostPerRequest: "0.50" # No single request over $0.50
-
-      # Alerts
-      alertAt: "80%"           # Notify when 80% of budget used
 ```
 
-When a limit is hit, the plugin returns a clear error to the agent instead of silently failing or retrying in a loop.
+Budget config is synced to BlockRun API on plugin startup. When a limit is hit, the API returns a clear error:
+
+```json
+{
+  "error": {
+    "message": "Daily budget exceeded: $5.02 spent, limit $5.00",
+    "type": "budget_exceeded",
+    "code": 400
+  }
+}
+```
+
+The plugin surfaces this to the agent as a structured error instead of silently failing or retrying in a loop.
+
+## Wallet Status
+
+Check your wallet balance and spend:
+
+```bash
+openclaw blockrun status
+```
+
+```
+Wallet:    0xABC123...
+Balance:   42.50 USDC (Base)
+Today:     $3.21 spent  ($5.00 daily limit)
+This month: $28.40 spent ($50.00 monthly limit)
+```
+
+The plugin also logs balance on startup so you always know where you stand.
+
+## Error Handling
+
+Every failure returns a clear, structured error — no silent retries, no money burned.
+
+| Scenario | Error Type | What Happens |
+|----------|-----------|--------------|
+| Wallet empty | `insufficient_funds` | "Insufficient USDC balance. Fund wallet 0xABC... on Base." |
+| Daily budget hit | `budget_exceeded` | "Daily budget exceeded: $5.02 spent, limit $5.00" |
+| Provider rate limit | `rate_limited` | Auto-fallback to another provider (if enabled) |
+| Provider down | `provider_error` | Auto-fallback or clear error with provider name |
+| Invalid model | `invalid_model` | "Model 'foo/bar' not available. See blockrun.ai/models" |
 
 ## Available Models
 
@@ -184,13 +242,13 @@ The OpenClaw provider plugin. Runs a local HTTP proxy that sits between pi-ai an
 src/
 ├── index.ts      # Plugin entry — register() and activate() lifecycle
 ├── provider.ts   # Registers "blockrun" provider in OpenClaw
-├── proxy.ts      # Local HTTP proxy with payment handling
-├── router.ts     # Smart routing logic (model selection)
-├── budget.ts     # Spend controls and budget enforcement
+├── proxy.ts      # Local HTTP proxy with x402 payment handling
 ├── models.ts     # Model definitions and pricing
-├── auth.ts       # Wallet auto-generation and key resolution
+├── auth.ts       # Wallet auto-generation, keystore, and key resolution
 └── types.ts      # Type definitions
 ```
+
+The plugin is intentionally thin — a proxy that handles payment and forwards requests. Smart routing and spend enforcement live server-side in the BlockRun API where they can't be bypassed.
 
 ### BlockRun API (Closed Source)
 
@@ -201,6 +259,7 @@ POST /api/v1/chat/completions    — OpenAI-compatible chat endpoint
 GET  /api/v1/models              — List available models
 GET  /api/v1/usage               — Usage analytics
 GET  /api/v1/budget              — Current spend vs. limits
+GET  /api/v1/balance             — Wallet balance + spend summary
 ```
 
 ## Market Context
@@ -240,7 +299,7 @@ npm run typecheck
 
 ## Roadmap
 
-- [x] Phase 1: Provider plugin — one API key, 30+ models, x402 payment proxy
+- [x] Phase 1: Provider plugin — one wallet, 30+ models, x402 payment proxy
 - [ ] Phase 2: Smart routing — auto-select cheapest capable model
 - [ ] Phase 3: Spend controls — daily/monthly budgets, per-request limits
 - [ ] Phase 4: Usage analytics — cost tracking dashboard at blockrun.ai
