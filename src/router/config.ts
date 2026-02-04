@@ -53,8 +53,8 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       fallback: ["google/gemini-2.5-flash", "openai/gpt-4o-mini"],
     },
     COMPLEX: {
-      primary: "anthropic/claude-sonnet-4",
-      fallback: ["openai/gpt-4o", "google/gemini-2.5-pro"],
+      primary: "anthropic/claude-opus-4",
+      fallback: ["anthropic/claude-sonnet-4", "openai/gpt-4o"],
     },
     REASONING: {
       primary: "openai/o3",

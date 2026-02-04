@@ -37,13 +37,13 @@ export function selectModel(
     : 0;
   const costEstimate = inputCost + outputCost;
 
-  // Baseline: what GPT-4o would cost
-  const gpt4oPricing = modelPricing.get("openai/gpt-4o");
-  const baselineInput = gpt4oPricing
-    ? (estimatedInputTokens / 1_000_000) * gpt4oPricing.inputPrice
+  // Baseline: what Claude Opus would cost (the premium default)
+  const opusPricing = modelPricing.get("anthropic/claude-opus-4");
+  const baselineInput = opusPricing
+    ? (estimatedInputTokens / 1_000_000) * opusPricing.inputPrice
     : 0;
-  const baselineOutput = gpt4oPricing
-    ? (maxOutputTokens / 1_000_000) * gpt4oPricing.outputPrice
+  const baselineOutput = opusPricing
+    ? (maxOutputTokens / 1_000_000) * opusPricing.outputPrice
     : 0;
   const baselineCost = baselineInput + baselineOutput;
 

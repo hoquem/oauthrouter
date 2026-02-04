@@ -2,7 +2,7 @@
 
 # ClawRouter
 
-**Save 63% on LLM costs. Automatically.**
+**Save 78% on LLM costs. Automatically.**
 
 Route every request to the cheapest model that can handle it.
 One wallet, 30+ models, zero API keys.
@@ -19,10 +19,10 @@ One wallet, 30+ models, zero API keys.
 ---
 
 ```
-"What is 2+2?"            → Gemini Flash    $0.60/M    saved 94%
-"Summarize this article"   → DeepSeek Chat   $0.42/M    saved 96%
-"Build a React component"  → Claude Sonnet   $15.00/M   best quality
-"Prove this theorem"       → o3              $8.00/M    saved 20%
+"What is 2+2?"            → Gemini Flash    $0.60/M    saved 99%
+"Summarize this article"   → DeepSeek Chat   $0.42/M    saved 99%
+"Build a React component"  → Claude Opus     $75.00/M   best quality
+"Prove this theorem"       → o3              $8.00/M    saved 89%
 ```
 
 ClawRouter is a smart LLM router for [OpenClaw](https://github.com/openclaw/openclaw). It classifies each request, picks the cheapest model that can handle it, and pays per-request via [x402](https://x402.org) USDC micropayments on Base. No account, no API key — your wallet signs each payment.
@@ -63,13 +63,13 @@ Request → Rule-based scorer (< 1ms, free)
 
 Score maps to a tier:
 
-| Score | Tier | Primary Model | Output $/M | vs GPT-4o |
+| Score | Tier | Primary Model | Output $/M | vs Opus |
 |-------|------|--------------|-----------|-----------|
-| ≤ 0 | SIMPLE | gemini-2.5-flash | $0.60 | **94% cheaper** |
+| ≤ 0 | SIMPLE | gemini-2.5-flash | $0.60 | **99% cheaper** |
 | 1-2 | *ambiguous* | → LLM classifier | — | — |
-| 3-4 | MEDIUM | deepseek-chat | $0.42 | **96% cheaper** |
-| 5-6 | COMPLEX | claude-sonnet-4 | $15.00 | higher quality |
-| 7+ | REASONING | o3 | $8.00 | **20% cheaper** |
+| 3-4 | MEDIUM | deepseek-chat | $0.42 | **99% cheaper** |
+| 5-6 | COMPLEX | claude-opus-4 | $75.00 | best quality |
+| 7+ | REASONING | o3 | $8.00 | **89% cheaper** |
 
 ### LLM Classifier Fallback
 
@@ -81,15 +81,15 @@ When rules score in the ambiguous zone (1-2), ClawRouter sends the first 500 cha
 |------|-------------|-----------|
 | SIMPLE | 40% | $0.60 |
 | MEDIUM | 30% | $0.42 |
-| COMPLEX | 20% | $15.00 |
+| COMPLEX | 20% | $75.00 |
 | REASONING | 10% | $8.00 |
-| **Weighted avg** | | **$3.67/M — 63% savings vs GPT-4o** |
+| **Weighted avg** | | **$16.17/M — 78% savings vs Claude Opus** |
 
 Every routed request logs its decision:
 
 ```
 [ClawRouter] deepseek-chat (MEDIUM, rules, confidence=0.85)
-             Cost: $0.0004 | Baseline: $0.0095 | Saved: 95.8%
+             Cost: $0.0004 | Baseline: $0.0713 | Saved: 99.4%
 ```
 
 ## Models
@@ -263,9 +263,9 @@ console.log(decision);
 //   tier: "REASONING",
 //   confidence: 0.9,
 //   method: "rules",
-//   savings: 0.20,
+//   savings: 0.893,
 //   costEstimate: 0.032776,
-//   baselineCost: 0.040970,
+//   baselineCost: 0.307500,
 // }
 ```
 
@@ -319,32 +319,32 @@ Real output from `node test/dist/e2e.js` — routing decisions are made in <1ms:
 ```
 ═══ Routing Test Results ═══
 
-Simple queries (→ Gemini Flash, 94% savings):
+Simple queries (→ Gemini Flash, 99% savings):
   ✓ "What is the capital of France?" → SIMPLE
   ✓ "Hello" → SIMPLE
   ✓ "Define photosynthesis" → SIMPLE
   ✓ "Translate hello to Spanish" → SIMPLE
 
-Reasoning queries (→ o3, 20% savings):
+Reasoning queries (→ o3, 89% savings):
   ✓ "Prove sqrt(2) is irrational" → REASONING
   ✓ "Derive time complexity + prove optimal" → REASONING
 
 ═══ Full Router (rules-only path) ═══
 
-  ✓ Simple factual → google/gemini-2.5-flash (SIMPLE, rules) saved=94.0%
-  ✓ Greeting → google/gemini-2.5-flash (SIMPLE, rules) saved=94.0%
-  ✓ Math proof → openai/o3 (REASONING, rules) saved=20.0%
+  ✓ Simple factual → google/gemini-2.5-flash (SIMPLE, rules) saved=99.2%
+  ✓ Greeting → google/gemini-2.5-flash (SIMPLE, rules) saved=99.2%
+  ✓ Math proof → openai/o3 (REASONING, rules) saved=89.3%
 
 Cost estimate sanity:
   ✓ Cost estimate > 0: $0.002458
-  ✓ Baseline cost > 0: $0.040970
-  ✓ Savings in range [0,1]: 0.9400
-  ✓ Cost ($0.002458) <= Baseline ($0.040970)
+  ✓ Baseline cost > 0: $0.307500
+  ✓ Savings in range [0,1]: 0.9920
+  ✓ Cost ($0.002458) <= Baseline ($0.307500)
 
 ═══ Live Proxy Test ═══
 
   ✓ Health check: ok
-  [routed] google/gemini-2.5-flash (SIMPLE) saved=94.0%
+  [routed] google/gemini-2.5-flash (SIMPLE) saved=99.2%
   ✓ Response: 2+2 equals 4.
 
 ═══════════════════════════════════
@@ -352,7 +352,7 @@ Cost estimate sanity:
 ═══════════════════════════════════
 ```
 
-**Bottom line:** A simple "What is 2+2?" costs **$0.002** instead of **$0.041** — that's **94% savings** on every simple query.
+**Bottom line:** A simple "What is 2+2?" costs **$0.002** instead of **$0.308** on Opus — that's **99% savings** on every simple query.
 
 ## License
 
