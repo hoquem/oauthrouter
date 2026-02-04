@@ -28,9 +28,9 @@ import { startProxy } from "./proxy.js";
 import type { RoutingConfig } from "./router/index.js";
 
 const plugin: OpenClawPluginDefinition = {
-  id: "@blockrun/openclaw-provider",
-  name: "BlockRun Provider",
-  description: "30+ AI models with x402 micropayments — GPT-5, Claude, Gemini, DeepSeek, Grok",
+  id: "claw-router",
+  name: "ClawRouter",
+  description: "Smart LLM router — 30+ models, x402 micropayments, 63% cost savings",
   version: "0.1.0",
 
   register(api: OpenClawPluginApi) {
