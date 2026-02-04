@@ -48,32 +48,50 @@ Want a specific model instead? `openclaw config set model openai/gpt-4o` — you
 
 ## How Routing Works
 
-Hybrid rules-first approach. Heuristic rules handle ~80% of requests in <1ms at zero cost. Only ambiguous queries hit the LLM classifier.
+Hybrid rules-first approach. 14 weighted scoring dimensions classify ~80% of requests in <1ms at zero cost. Only low-confidence queries hit the LLM classifier.
 
 ```
-Request → Rule-based scorer (< 1ms, free)
-            ├── Clear → pick model → done
-            └── Ambiguous → LLM classifier (~200ms, ~$0.00003)
-                              └── classify → pick model → done
+Request → Weighted scorer (14 dimensions, < 1ms, free)
+            ├── Confident → pick model → done
+            └── Low confidence → LLM classifier (~200ms, ~$0.00003)
+                                   └── classify → pick model → done
 ```
 
-### Rules Engine
+### Weighted Scoring Engine
 
-8 scoring dimensions: token count, code presence, reasoning markers, technical terms, creative markers, simple indicators, multi-step patterns, question complexity.
+14 dimensions, each scored in [-1, 1] and multiplied by a learned weight:
 
-Score maps to a tier:
+| Dimension | Weight | Signal |
+|-----------|--------|--------|
+| Reasoning markers | 0.18 | "prove", "theorem", "step by step" |
+| Code presence | 0.15 | "function", "async", "import", "```" |
+| Simple indicators | 0.12 | "what is", "define", "translate" |
+| Multi-step patterns | 0.12 | "first...then", "step 1", numbered lists |
+| Technical terms | 0.10 | "algorithm", "kubernetes", "distributed" |
+| Token count | 0.08 | short (<50) vs long (>500) |
+| Creative markers | 0.05 | "story", "poem", "brainstorm" |
+| Question complexity | 0.05 | 4+ question marks |
+| Constraint count | 0.04 | "at most", "O(n)", "maximum" |
+| Imperative verbs | 0.03 | "build", "create", "implement" |
+| Output format | 0.03 | "json", "yaml", "schema" |
+| Domain specificity | 0.02 | "quantum", "fpga", "genomics" |
+| Reference complexity | 0.02 | "the docs", "the api", "above" |
+| Negation complexity | 0.01 | "don't", "avoid", "without" |
 
-| Score | Tier | Primary Model | Output $/M | vs Opus |
-|-------|------|--------------|-----------|-----------|
-| ≤ 0 | SIMPLE | gemini-2.5-flash | $0.60 | **99% cheaper** |
-| 1-2 | *ambiguous* | → LLM classifier | — | — |
-| 3-4 | MEDIUM | deepseek-chat | $0.42 | **99% cheaper** |
-| 5-6 | COMPLEX | claude-opus-4 | $75.00 | best quality |
-| 7+ | REASONING | o3 | $8.00 | **89% cheaper** |
+Weighted score maps to a tier via configurable boundaries. Confidence is calibrated using a sigmoid function — distance from the nearest tier boundary determines how sure the classifier is.
+
+| Tier | Primary Model | Output $/M | vs Opus |
+|------|--------------|-----------|-----------|
+| SIMPLE | gemini-2.5-flash | $0.60 | **99% cheaper** |
+| MEDIUM | deepseek-chat | $0.42 | **99% cheaper** |
+| COMPLEX | claude-opus-4 | $75.00 | best quality |
+| REASONING | o3 | $8.00 | **89% cheaper** |
+
+Special override: 2+ reasoning markers → REASONING at 0.97 confidence, regardless of other dimensions.
 
 ### LLM Classifier Fallback
 
-When rules score in the ambiguous zone (1-2), ClawRouter sends the first 500 characters to `gemini-2.5-flash` with `max_tokens: 10` and asks for one word: SIMPLE, MEDIUM, COMPLEX, or REASONING. Cost per classification: ~$0.00003. Results cached for 1 hour.
+When confidence is below the threshold (0.70), ClawRouter sends the first 500 characters to `gemini-2.5-flash` with `max_tokens: 10` and asks for one word: SIMPLE, MEDIUM, COMPLEX, or REASONING. Cost per classification: ~$0.00003. Results cached for 1 hour.
 
 ### Estimated Savings
 
@@ -88,7 +106,7 @@ When rules score in the ambiguous zone (1-2), ClawRouter sends the first 500 cha
 Every routed request logs its decision:
 
 ```
-[ClawRouter] deepseek-chat (MEDIUM, rules, confidence=0.85)
+[ClawRouter] deepseek-chat (MEDIUM, rules, confidence=0.82)
              Cost: $0.0004 | Baseline: $0.0713 | Saved: 99.4%
 ```
 
@@ -194,7 +212,7 @@ src/
 ├── types.ts              # OpenClaw plugin type definitions
 └── router/
     ├── index.ts           # route() entry point
-    ├── rules.ts           # Rule-based classifier (8 scoring dimensions)
+    ├── rules.ts           # Weighted classifier (14 dimensions, sigmoid confidence)
     ├── llm-classifier.ts  # LLM fallback (gemini-flash, cached)
     ├── selector.ts        # Tier → model selection + cost calculation
     ├── config.ts          # Default routing configuration
@@ -261,7 +279,7 @@ console.log(decision);
 // {
 //   model: "openai/o3",
 //   tier: "REASONING",
-//   confidence: 0.9,
+//   confidence: 0.973,
 //   method: "rules",
 //   savings: 0.893,
 //   costEstimate: 0.032776,
@@ -292,6 +310,9 @@ BLOCKRUN_WALLET_KEY=0x... node test/dist/e2e.js
 - [x] Provider plugin — one wallet, 30+ models, x402 payment proxy
 - [x] Smart routing — hybrid rules + LLM classifier, 4-tier model selection
 - [x] Usage logging — JSON lines to disk, per-request cost tracking
+- [x] Weighted scoring engine — 14 dimensions, sigmoid confidence, configurable tier boundaries
+- [ ] KNN fallback — embedding-based classifier to replace LLM fallback (<5ms vs ~200ms)
+- [ ] Cascade routing — try cheaper model first, escalate on low quality (AutoMix-inspired)
 - [ ] Graceful fallback — auto-switch on rate limit or provider error
 - [ ] Spend controls — daily/monthly budgets, server-side enforcement
 - [ ] Cost dashboard — analytics at blockrun.ai
@@ -314,41 +335,35 @@ As agents become autonomous, they need financial infrastructure designed for mac
 
 ## Test Results
 
-Real output from `node test/dist/e2e.js` — routing decisions are made in <1ms:
+Real output from `node test/dist/e2e.js` — weighted scoring with sigmoid confidence:
 
 ```
-═══ Routing Test Results ═══
+═══ Rule-Based Classifier ═══
 
-Simple queries (→ Gemini Flash, 99% savings):
-  ✓ "What is the capital of France?" → SIMPLE
-  ✓ "Hello" → SIMPLE
-  ✓ "Define photosynthesis" → SIMPLE
-  ✓ "Translate hello to Spanish" → SIMPLE
+Simple queries:
+  ✓ "What is the capital of France?" → SIMPLE (score=-0.200)
+  ✓ "Hello" → SIMPLE (score=-0.200)
+  ✓ "Define photosynthesis" → SIMPLE (score=-0.125)
+  ✓ "Translate hello to Spanish" → SIMPLE (score=-0.200)
+  ✓ "Yes or no: is the sky blue?" → SIMPLE (score=-0.200)
 
-Reasoning queries (→ o3, 89% savings):
-  ✓ "Prove sqrt(2) is irrational" → REASONING
-  ✓ "Derive time complexity + prove optimal" → REASONING
+Complex queries (correctly deferred to classifier):
+  ✓ Kanban board → AMBIGUOUS (score=0.090, conf=0.673)
+  ✓ Distributed trading → AMBIGUOUS (score=0.127, conf=0.569)
 
-═══ Full Router (rules-only path) ═══
+Reasoning queries:
+  ✓ "Prove sqrt(2) irrational" → REASONING (score=0.180, conf=0.973)
+  ✓ "Derive time complexity" → REASONING (score=0.186, conf=0.973)
+  ✓ "Chain of thought proof" → REASONING (score=0.180, conf=0.973)
+
+═══ Full Router ═══
 
   ✓ Simple factual → google/gemini-2.5-flash (SIMPLE, rules) saved=99.2%
   ✓ Greeting → google/gemini-2.5-flash (SIMPLE, rules) saved=99.2%
   ✓ Math proof → openai/o3 (REASONING, rules) saved=89.3%
 
-Cost estimate sanity:
-  ✓ Cost estimate > 0: $0.002458
-  ✓ Baseline cost > 0: $0.307500
-  ✓ Savings in range [0,1]: 0.9920
-  ✓ Cost ($0.002458) <= Baseline ($0.307500)
-
-═══ Live Proxy Test ═══
-
-  ✓ Health check: ok
-  [routed] google/gemini-2.5-flash (SIMPLE) saved=99.2%
-  ✓ Response: 2+2 equals 4.
-
 ═══════════════════════════════════
-  21 passed, 0 failed
+  19 passed, 0 failed
 ═══════════════════════════════════
 ```
 
