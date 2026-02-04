@@ -1,19 +1,14 @@
 /**
- * @blockrun/openclaw-provider
+ * @blockrun/clawrouter
  *
- * OpenClaw plugin that adds BlockRun as an LLM provider with 30+ AI models.
- * Payments are handled automatically via x402 USDC micropayments on Base.
- * Smart routing picks the cheapest capable model for each request.
+ * Smart LLM router for OpenClaw — 30+ models, x402 micropayments, 78% cost savings.
+ * Routes each request to the cheapest model that can handle it.
  *
  * Usage:
  *   # Install the plugin
- *   openclaw plugin install @blockrun/openclaw-provider
+ *   openclaw plugin install @blockrun/clawrouter
  *
- *   # Set wallet key
- *   export BLOCKRUN_WALLET_KEY=0x...
- *
- *   # Or configure via wizard
- *   openclaw provider add blockrun
+ *   # Fund your wallet with USDC on Base (address printed on install)
  *
  *   # Use smart routing (auto-picks cheapest model)
  *   openclaw config set model blockrun/auto
@@ -32,7 +27,7 @@ const plugin: OpenClawPluginDefinition = {
   id: "clawrouter",
   name: "ClawRouter",
   description: "Smart LLM router — 30+ models, x402 micropayments, 78% cost savings",
-  version: "0.2.0",
+  version: "0.2.2",
 
   register(api: OpenClawPluginApi) {
     // Register BlockRun as a provider

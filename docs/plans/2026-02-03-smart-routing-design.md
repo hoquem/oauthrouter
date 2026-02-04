@@ -1,10 +1,10 @@
 # ClawRouter: Client-Side Smart Routing Design
 
-> **Status: Implemented** — Core routing shipped in [`src/router/`](../../src/router/). This document is the design record.
+> **Status: Implemented (v2)** — Weighted scoring engine shipped in [`src/router/`](../../src/router/). This document is the design record.
 
 ## Problem
 
-Simple queries go to GPT-4o at $10/M output tokens when Gemini Flash could handle them at $0.60/M. No cost-aware model selection.
+Simple queries go to Claude Opus at $75/M output tokens when Gemini Flash could handle them at $0.60/M. No cost-aware model selection.
 
 Phase 1 solved API key management (one wallet for 30+ models). Phase 2 solves cost optimization by routing queries to the cheapest capable model.
 
@@ -41,17 +41,17 @@ OpenClaw Agent
 │              ClawRouter (src/router/)             │
 │                                                   │
 │  ┌─────────────────────────────────────────────┐ │
-│  │  Step 1: Rule-Based Classifier (< 1ms)      │ │
-│  │  • Token count heuristic                     │ │
-│  │  • Code detection (backticks, keywords)      │ │
-│  │  • Reasoning markers                         │ │
-│  │  • Length-based bucketing                     │ │
-│  │  • Returns: tier or AMBIGUOUS                │ │
+│  │  Step 1: Weighted Scoring Engine (< 1ms)    │ │
+│  │  • 14 scoring dimensions, each [-1, 1]      │ │
+│  │  • Weighted sum → float score               │ │
+│  │  • Sigmoid confidence calibration           │ │
+│  │  • Returns: tier or null (ambiguous)        │ │
 │  └─────────────────────┬───────────────────────┘ │
 │                        |                          │
 │          ┌─────────────┴──────────────┐          │
 │          |                            |           │
-│     tier found                   AMBIGUOUS        │
+│     confident                    ambiguous        │
+│   (conf >= 0.70)              (conf < 0.70)       │
 │          |                            |           │
 │          |  ┌─────────────────────────┴────────┐ │
 │          |  │  Step 2: LLM Classifier (~200ms) │ │
@@ -84,7 +84,7 @@ OpenClaw Agent
 
 ## Classification Tiers
 
-Four tiers. REASONING is distinct from COMPLEX because reasoning tasks need different models (o3, gemini-pro) than general complex tasks (gpt-4o, sonnet-4).
+Four tiers. REASONING is distinct from COMPLEX because reasoning tasks need different models (o3, gemini-pro) than general complex tasks (claude-opus-4, gpt-4o).
 
 | Tier | Description | Example Queries |
 |------|-------------|-----------------|
@@ -93,40 +93,57 @@ Four tiers. REASONING is distinct from COMPLEX because reasoning tasks need diff
 | **COMPLEX** | Multi-step code, system design, creative writing | "Build a React component with tests", "Design a REST API" |
 | **REASONING** | Proofs, multi-step logic, mathematical reasoning | "Prove this theorem", "Solve step by step", "Debug this algorithm" |
 
-## Rule-Based Classifier
+## Weighted Scoring Engine (v2)
 
 Implemented in [`src/router/rules.ts`](../../src/router/rules.ts).
 
-Scores each request across 8 dimensions, then maps the aggregate score to a tier. If the score falls in an ambiguous zone, returns `null` to trigger the LLM classifier.
+14 dimensions, each scored in [-1, 1] and multiplied by a learned weight:
 
-### Scoring Dimensions
+| Dimension | Weight | Signal |
+|-----------|--------|--------|
+| Reasoning markers | 0.18 | "prove", "theorem", "step by step" |
+| Code presence | 0.15 | "function", "async", "import", "```" |
+| Simple indicators | 0.12 | "what is", "define", "translate" |
+| Multi-step patterns | 0.12 | "first...then", "step 1", numbered lists |
+| Technical terms | 0.10 | "algorithm", "kubernetes", "distributed" |
+| Token count | 0.08 | short (<50) vs long (>500) |
+| Creative markers | 0.05 | "story", "poem", "brainstorm" |
+| Question complexity | 0.05 | 4+ question marks |
+| Constraint count | 0.04 | "at most", "O(n)", "maximum" |
+| Imperative verbs | 0.03 | "build", "create", "implement" |
+| Output format | 0.03 | "json", "yaml", "schema" |
+| Domain specificity | 0.02 | "quantum", "fpga", "genomics" |
+| Reference complexity | 0.02 | "the docs", "the api", "above" |
+| Negation complexity | 0.01 | "don't", "avoid", "without" |
 
-| Dimension | Signal | Score Impact |
-|-----------|--------|-------------|
-| **Token count** | Estimated via `text.length / 4` | < 50 tokens: -2, > 500 tokens: +2 |
-| **Code presence** | Backticks, `function`, `class`, `import`, `SELECT`, `{`, `}` | +1 or +2 if code detected |
-| **Reasoning markers** | "prove", "step by step", "derive", "theorem", "chain of thought" | +3 (routes to REASONING) |
-| **Technical terms** | "algorithm", "optimize", "architecture", "distributed", "kubernetes" | +1 per 2 matches |
-| **Creative markers** | "write a story", "compose", "brainstorm", "creative" | +1 |
-| **Simple indicators** | "what is", "define", "translate", "yes or no", "hello" | -2 |
-| **Multi-step patterns** | "first...then", numbered lists, "step 1" | +1 |
-| **Question count** | Multiple `?` in input | > 3 questions: +1 |
+Weighted score maps to a tier via configurable boundaries. Confidence is calibrated using a sigmoid function — distance from the nearest tier boundary determines how sure the classifier is.
 
-### Score → Tier Mapping
+### Tier Boundaries
 
 ```
-Score <= 0     → SIMPLE     (confidence: 0.85-0.95)
-Score 1-2      → AMBIGUOUS  (triggers LLM classifier)
-Score 3-4      → MEDIUM     (confidence: 0.75-0.85)
-Score 5-6      → COMPLEX    (confidence: 0.70-0.85)
-Score 7+       → REASONING  (confidence: 0.70-0.80)
-                 OR if 2+ reasoning markers → REASONING (confidence: 0.90)
+Score < 0.00   → SIMPLE
+Score 0.00-0.15 → MEDIUM
+Score 0.15-0.25 → COMPLEX
+Score > 0.25   → REASONING
+```
+
+### Sigmoid Confidence Calibration
+
+```typescript
+function calibrateConfidence(distance: number, steepness: number): number {
+  return 1 / (1 + Math.exp(-steepness * distance));
+}
+// steepness = 12 (tuned)
+// distance = how far the score is from the nearest tier boundary
+// Near boundary → confidence ~0.50 → triggers LLM fallback
+// Far from boundary → confidence ~0.95+ → confident classification
 ```
 
 ### Special Case Overrides
 
 | Condition | Override | Reason |
 |-----------|----------|--------|
+| 2+ reasoning markers | Force REASONING at >= 0.85 confidence | Reasoning markers are strong signals |
 | Input > 100K tokens | Force COMPLEX tier | Large context = expensive regardless |
 | System prompt contains "JSON" or "structured" | Minimum MEDIUM tier | Structured output needs capable models |
 
@@ -134,7 +151,7 @@ Score 7+       → REASONING  (confidence: 0.70-0.80)
 
 Implemented in [`src/router/llm-classifier.ts`](../../src/router/llm-classifier.ts).
 
-When the rule-based classifier returns AMBIGUOUS, sends a classification request to the cheapest available model.
+When weighted scoring confidence is below 0.70, sends a classification request to the cheapest available model.
 
 ### Implementation Details
 
@@ -152,22 +169,22 @@ When the rule-based classifier returns AMBIGUOUS, sends a classification request
 
 Implemented in [`src/router/selector.ts`](../../src/router/selector.ts) and [`src/router/config.ts`](../../src/router/config.ts).
 
-| Tier | Primary Model | Cost (input/output per M) | Fallback Chain |
-|------|--------------|---------------------------|----------------|
-| **SIMPLE** | `google/gemini-2.5-flash` | $0.15 / $0.60 | deepseek-chat → gpt-4o-mini |
-| **MEDIUM** | `deepseek/deepseek-chat` | $0.28 / $0.42 | gemini-flash → gpt-4o-mini |
-| **COMPLEX** | `anthropic/claude-sonnet-4` | $3.00 / $15.00 | gpt-4o → gemini-2.5-pro |
-| **REASONING** | `openai/o3` | $2.00 / $8.00 | gemini-2.5-pro → claude-sonnet-4 |
+| Tier | Primary Model | Cost (output per M) | Fallback Chain |
+|------|--------------|---------------------|----------------|
+| **SIMPLE** | `google/gemini-2.5-flash` | $0.60 | deepseek-chat → gpt-4o-mini |
+| **MEDIUM** | `deepseek/deepseek-chat` | $0.42 | gemini-flash → gpt-4o-mini |
+| **COMPLEX** | `anthropic/claude-opus-4.5` | $75.00 | gpt-4o → gemini-2.5-pro |
+| **REASONING** | `openai/o3` | $8.00 | gemini-2.5-pro → claude-sonnet-4 |
 
-### Cost Savings
+### Cost Savings (vs Claude Opus at $75/M)
 
-| Tier | % of Queries | Cost (per M output) | vs GPT-4o ($10/M) |
-|------|-------------|--------------------|--------------------|
-| SIMPLE | 40% | $0.60 | **94% savings** |
-| MEDIUM | 30% | $0.42 | **96% savings** |
-| COMPLEX | 20% | $15.00 | 50% more (but better quality) |
-| REASONING | 10% | $8.00 | **20% savings** |
-| **Weighted average** | | **$3.67/M** | **63% savings** |
+| Tier | % of Traffic | Output $/M | Savings |
+|------|-------------|-----------|---------|
+| SIMPLE | 40% | $0.60 | **99% cheaper** |
+| MEDIUM | 30% | $0.42 | **99% cheaper** |
+| COMPLEX | 20% | $75.00 | best quality |
+| REASONING | 10% | $8.00 | **89% cheaper** |
+| **Weighted avg** | | **$16.17/M** | **78% savings** |
 
 ## RoutingDecision Object
 
@@ -177,43 +194,47 @@ Defined in [`src/router/types.ts`](../../src/router/types.ts).
 type RoutingDecision = {
   model: string;           // "deepseek/deepseek-chat"
   tier: Tier;              // "MEDIUM"
-  confidence: number;      // 0.85
+  confidence: number;      // 0.82
   method: "rules" | "llm"; // How the decision was made
-  reasoning: string;       // "score=-4, signals: short (8 tokens), simple indicator (what is)"
+  reasoning: string;       // "score=-0.200 | short (8 tokens), simple indicator (what is)"
   costEstimate: number;    // 0.0004
-  baselineCost: number;    // 0.0095 (what GPT-4o would have cost)
-  savings: number;         // 0.958 (0-1)
+  baselineCost: number;    // 0.3073 (what Claude Opus would have cost)
+  savings: number;         // 0.992 (0-1)
 };
 ```
 
 ## E2E Test Results
 
-20 tests, 0 failures. See [`test/e2e.ts`](../../test/e2e.ts).
+19 tests, 0 failures. See [`test/e2e.ts`](../../test/e2e.ts).
 
 ```
-═══ Part 1: Rule-Based Classifier ═══
-  ✓ "What is the capital of France?" → SIMPLE (score=-4)
-  ✓ "Hello" → SIMPLE (score=-4)
-  ✓ "Define photosynthesis" → SIMPLE (score=-3)
-  ✓ "Translate hello to Spanish" → SIMPLE (score=-4)
-  ✓ "Yes or no: is the sky blue?" → SIMPLE (score=-4)
-  ✓ Kanban board → AMBIGUOUS (score=1) — correctly defers to LLM classifier
-  ✓ Distributed trading platform → AMBIGUOUS (score=2) — correctly defers to LLM
-  ✓ "Prove sqrt(2) irrational" → REASONING (score=3)
-  ✓ "Derive time complexity + prove optimal" → REASONING (score=3)
-  ✓ "Chain of thought proof" → REASONING (score=3)
+═══ Rule-Based Classifier ═══
 
-═══ Part 2: Full Router ═══
-  ✓ Simple factual → gemini-2.5-flash (SIMPLE, rules) saved=94.0%
-  ✓ Greeting → gemini-2.5-flash (SIMPLE, rules) saved=94.0%
-  ✓ Math proof → o3 (REASONING, rules) saved=20.0%
-  ✓ 125K token input → COMPLEX (forced override)
-  ✓ Structured output → MEDIUM (min tier applied)
-  ✓ Cost estimate > 0, baseline > 0, savings in [0,1], cost <= baseline
+Simple queries:
+  ✓ "What is the capital of France?" → SIMPLE (score=-0.200)
+  ✓ "Hello" → SIMPLE (score=-0.200)
+  ✓ "Define photosynthesis" → SIMPLE (score=-0.125)
+  ✓ "Translate hello to Spanish" → SIMPLE (score=-0.200)
+  ✓ "Yes or no: is the sky blue?" → SIMPLE (score=-0.200)
 
-═══ Part 3: Proxy Startup ═══
-  ✓ Health check: ok, wallet: 0x4069...
-  ✓ Smart routing: "What is 2+2?" → gemini-flash (SIMPLE) saved=94.0%
+Complex queries (correctly deferred to classifier):
+  ✓ Kanban board → AMBIGUOUS (score=0.090, conf=0.673)
+  ✓ Distributed trading → AMBIGUOUS (score=0.127, conf=0.569)
+
+Reasoning queries:
+  ✓ "Prove sqrt(2) irrational" → REASONING (score=0.180, conf=0.973)
+  ✓ "Derive time complexity" → REASONING (score=0.186, conf=0.973)
+  ✓ "Chain of thought proof" → REASONING (score=0.180, conf=0.973)
+
+═══ Full Router ═══
+
+  ✓ Simple factual → google/gemini-2.5-flash (SIMPLE, rules) saved=99.2%
+  ✓ Greeting → google/gemini-2.5-flash (SIMPLE, rules) saved=99.2%
+  ✓ Math proof → openai/o3 (REASONING, rules) saved=89.3%
+
+═══════════════════════════════════
+  19 passed, 0 failed
+═══════════════════════════════════
 ```
 
 ## File Structure
@@ -229,17 +250,18 @@ src/
 ├── types.ts              # OpenClaw plugin type definitions
 └── router/
     ├── index.ts           # route() entry point
-    ├── rules.ts           # Rule-based classifier (8 dimensions)
+    ├── rules.ts           # Weighted classifier (14 dimensions, sigmoid confidence)
     ├── llm-classifier.ts  # LLM fallback (gemini-flash, cached)
     ├── selector.ts        # Tier → model selection + cost calculation
-    ├── config.ts          # DEFAULT_ROUTING_CONFIG constant
+    ├── config.ts          # Default routing configuration
     └── types.ts           # RoutingDecision, Tier, ScoringResult
 ```
 
 ## Not Implemented (Future)
 
+- **KNN fallback** — Embedding-based classifier to replace LLM fallback (<5ms vs ~200ms)
+- **Cascade routing** — Try cheaper model first, escalate on low quality (AutoMix-inspired)
 - **Graceful fallback** — Auto-switch on rate limit or provider error using per-tier fallback chains
 - **Spend controls** — Daily/monthly budgets, server-side enforcement
-- **Semantic caching** — Too heavy for client-side (needs embedding model + vector store)
 - **Quality feedback loop** — Learning from past routing decisions to improve accuracy
 - **Conversation context** — Current design is per-message. Future: track conversation complexity over time
