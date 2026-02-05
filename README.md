@@ -143,7 +143,7 @@ Compared to **$75/M** for Claude Opus = **96% savings** on a typical workload.
 | grok-3            | $3.00     | $15.00     | 131K    |    \*     |
 | grok-3-mini       | $0.30     | $0.50      | 131K    |           |
 | **Moonshot**      |           |            |         |           |
-| kimi-k2.5         | $0.60     | $3.00      | 128K    |    \*     |
+| kimi-k2.5         | $0.50     | $2.40      | 128K    |    \*     |
 
 Full list: [`src/models.ts`](src/models.ts)
 
