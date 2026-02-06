@@ -24,7 +24,7 @@ import { resolveOrGenerateWalletKey } from "./auth.js";
 import type { RoutingConfig } from "./router/index.js";
 import { BalanceMonitor } from "./balance.js";
 import { OPENCLAW_MODELS } from "./models.js";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -61,6 +61,64 @@ function injectModelsConfig(logger: { info: (msg: string) => void }): void {
     logger.info("Injected BlockRun models into OpenClaw config");
   } catch {
     // Silently fail — config injection is best-effort
+  }
+}
+
+/**
+ * Inject dummy auth profile for BlockRun into agent auth stores.
+ * OpenClaw's agent system looks for auth credentials even if provider has auth: [].
+ * We inject a placeholder so the lookup succeeds (proxy handles real auth internally).
+ */
+function injectAuthProfile(logger: { info: (msg: string) => void }): void {
+  const agentsDir = join(homedir(), ".openclaw", "agents");
+  if (!existsSync(agentsDir)) {
+    return; // No agents directory yet
+  }
+
+  try {
+    // Find all agent directories
+    const agents = readdirSync(agentsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+
+    for (const agentId of agents) {
+      const authDir = join(agentsDir, agentId, "agent");
+      const authPath = join(authDir, "auth-profiles.json");
+
+      // Create agent dir if needed
+      if (!existsSync(authDir)) {
+        mkdirSync(authDir, { recursive: true });
+      }
+
+      // Load or create auth-profiles.json
+      let authProfiles: Record<string, unknown> = {};
+      if (existsSync(authPath)) {
+        try {
+          authProfiles = JSON.parse(readFileSync(authPath, "utf-8"));
+        } catch {
+          authProfiles = {};
+        }
+      }
+
+      // Check if blockrun auth already exists
+      if (authProfiles.blockrun) {
+        continue; // Already configured
+      }
+
+      // Inject placeholder auth for blockrun
+      // The proxy handles real x402 auth internally, this just satisfies OpenClaw's lookup
+      authProfiles.blockrun = {
+        profileId: "default",
+        credential: {
+          apiKey: "x402-proxy-handles-auth",
+        },
+      };
+
+      writeFileSync(authPath, JSON.stringify(authProfiles, null, 2));
+      logger.info(`Injected BlockRun auth profile for agent: ${agentId}`);
+    }
+  } catch {
+    // Silently fail — auth injection is best-effort
   }
 }
 
@@ -146,6 +204,10 @@ const plugin: OpenClawPluginDefinition = {
     // Inject models config into OpenClaw config file
     // This persists the config so models are recognized on restart
     injectModelsConfig(api.logger);
+
+    // Inject dummy auth profiles into agent auth stores
+    // OpenClaw's agent system looks for auth even if provider has auth: []
+    injectAuthProfile(api.logger);
 
     // Also set runtime config for immediate availability
     if (!api.config.models) {
