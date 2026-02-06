@@ -6,8 +6,7 @@
  * pi-ai sees a standard OpenAI-compatible API at localhost.
  */
 
-import type { ProviderPlugin, AuthProfileCredential } from "./types.js";
-import { walletKeyAuth, envKeyAuth } from "./auth.js";
+import type { ProviderPlugin } from "./types.js";
 import { buildProviderModels } from "./models.js";
 import type { ProxyHandle } from "./proxy.js";
 
@@ -47,14 +46,8 @@ export const blockrunProvider: ProviderPlugin = {
     return buildProviderModels(activeProxy.baseUrl);
   },
 
-  // Auth methods
-  auth: [envKeyAuth, walletKeyAuth],
-
-  // Format the stored credential as the wallet key
-  formatApiKey: (cred: AuthProfileCredential): string => {
-    if ("apiKey" in cred && typeof cred.apiKey === "string") {
-      return cred.apiKey;
-    }
-    throw new Error("BlockRun credential must contain an apiKey (wallet private key)");
-  },
+  // No auth required — the x402 proxy handles wallet-based payments internally.
+  // The proxy auto-generates a wallet on first run and stores it at
+  // ~/.openclaw/blockrun/wallet.key. Users just fund that wallet with USDC.
+  auth: [],
 };
