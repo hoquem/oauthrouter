@@ -36,11 +36,26 @@ import {
 import { BLOCKRUN_MODELS } from "./models.js";
 import { logUsage, type UsageEntry } from "./logger.js";
 import { RequestDeduplicator } from "./dedup.js";
+import { BalanceMonitor, type BalanceInfo } from "./balance.js";
+import { InsufficientFundsError, EmptyWalletError } from "./errors.js";
 
 const BLOCKRUN_API = "https://blockrun.ai/api";
 const AUTO_MODEL = "blockrun/auto";
 const USER_AGENT = "clawrouter/0.3.2";
 const HEARTBEAT_INTERVAL_MS = 2_000;
+
+/** Callback info for low balance warning */
+export type LowBalanceInfo = {
+  balanceUSD: string;
+  walletAddress: string;
+};
+
+/** Callback info for insufficient funds error */
+export type InsufficientFundsInfo = {
+  balanceUSD: string;
+  requiredUSD: string;
+  walletAddress: string;
+};
 
 export type ProxyOptions = {
   walletKey: string;
@@ -51,11 +66,17 @@ export type ProxyOptions = {
   onError?: (error: Error) => void;
   onPayment?: (info: { model: string; amount: string; network: string }) => void;
   onRouted?: (decision: RoutingDecision) => void;
+  /** Called when balance drops below $1.00 (warning, request still proceeds) */
+  onLowBalance?: (info: LowBalanceInfo) => void;
+  /** Called when balance is insufficient for a request (request fails) */
+  onInsufficientFunds?: (info: InsufficientFundsInfo) => void;
 };
 
 export type ProxyHandle = {
   port: number;
   baseUrl: string;
+  walletAddress: string;
+  balanceMonitor: BalanceMonitor;
   close: () => Promise<void>;
 };
 
@@ -124,6 +145,9 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   const account = privateKeyToAccount(options.walletKey as `0x${string}`);
   const { fetch: payFetch } = createPaymentFetch(options.walletKey as `0x${string}`);
 
+  // Create balance monitor for pre-request checks
+  const balanceMonitor = new BalanceMonitor(account.address);
+
   // Build router options (100% local — no external API calls for routing)
   const routingConfig = mergeRoutingConfig(options.routingConfig);
   const modelPricing = buildModelPricing();
@@ -151,7 +175,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
     }
 
     try {
-      await proxyRequest(req, res, apiBase, payFetch, options, routerOpts, deduplicator);
+      await proxyRequest(req, res, apiBase, payFetch, options, routerOpts, deduplicator, balanceMonitor);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       options.onError?.(error);
@@ -190,6 +214,8 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       resolve({
         port,
         baseUrl,
+        walletAddress: account.address,
+        balanceMonitor,
         close: () =>
           new Promise<void>((res, rej) => {
             server.close((err) => (err ? rej(err) : res()));
@@ -220,6 +246,7 @@ async function proxyRequest(
   options: ProxyOptions,
   routerOpts: RouterOptions,
   deduplicator: RequestDeduplicator,
+  balanceMonitor: BalanceMonitor,
 ): Promise<void> {
   const startTime = Date.now();
 
@@ -301,6 +328,55 @@ async function proxyRequest(
   // Register this request as in-flight
   deduplicator.markInflight(dedupKey);
 
+  // --- Pre-request balance check ---
+  // Estimate cost and check if wallet has sufficient balance
+  let estimatedCostMicros: bigint | undefined;
+  if (modelId) {
+    const estimated = estimateAmount(modelId, body.length, maxTokens);
+    if (estimated) {
+      estimatedCostMicros = BigInt(estimated);
+
+      // Check balance before proceeding
+      const sufficiency = await balanceMonitor.checkSufficient(estimatedCostMicros);
+
+      if (sufficiency.info.isEmpty) {
+        // Wallet is empty — cannot proceed
+        deduplicator.removeInflight(dedupKey);
+        const error = new EmptyWalletError(sufficiency.info.walletAddress);
+        options.onInsufficientFunds?.({
+          balanceUSD: sufficiency.info.balanceUSD,
+          requiredUSD: balanceMonitor.formatUSDC(estimatedCostMicros),
+          walletAddress: sufficiency.info.walletAddress,
+        });
+        throw error;
+      }
+
+      if (!sufficiency.sufficient) {
+        // Insufficient balance — cannot proceed
+        deduplicator.removeInflight(dedupKey);
+        const error = new InsufficientFundsError({
+          currentBalanceUSD: sufficiency.info.balanceUSD,
+          requiredUSD: balanceMonitor.formatUSDC(estimatedCostMicros),
+          walletAddress: sufficiency.info.walletAddress,
+        });
+        options.onInsufficientFunds?.({
+          balanceUSD: sufficiency.info.balanceUSD,
+          requiredUSD: balanceMonitor.formatUSDC(estimatedCostMicros),
+          walletAddress: sufficiency.info.walletAddress,
+        });
+        throw error;
+      }
+
+      if (sufficiency.info.isLow) {
+        // Balance is low but sufficient — warn and proceed
+        options.onLowBalance?.({
+          balanceUSD: sufficiency.info.balanceUSD,
+          walletAddress: sufficiency.info.walletAddress,
+        });
+      }
+    }
+  }
+
   // --- Streaming: early header flush + heartbeat ---
   let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
   let headersSentEarly = false;
@@ -344,13 +420,10 @@ async function proxyRequest(
   }
   headers["user-agent"] = USER_AGENT;
 
-  // --- Payment pre-auth: estimate amount to skip 402 round trip ---
+  // --- Payment pre-auth: use already-estimated amount to skip 402 round trip ---
   let preAuth: PreAuthParams | undefined;
-  if (modelId) {
-    const estimated = estimateAmount(modelId, body.length, maxTokens);
-    if (estimated) {
-      preAuth = { estimatedAmount: estimated };
-    }
+  if (estimatedCostMicros !== undefined) {
+    preAuth = { estimatedAmount: estimatedCostMicros.toString() };
   }
 
   try {
@@ -452,6 +525,11 @@ async function proxyRequest(
         completedAt: Date.now(),
       });
     }
+
+    // --- Optimistic balance deduction after successful response ---
+    if (estimatedCostMicros !== undefined) {
+      balanceMonitor.deductEstimated(estimatedCostMicros);
+    }
   } catch (err) {
     // Clear heartbeat on error
     if (heartbeatInterval) {
@@ -460,6 +538,9 @@ async function proxyRequest(
 
     // Remove in-flight entry so retries aren't blocked
     deduplicator.removeInflight(dedupKey);
+
+    // Invalidate balance cache on payment failure (might be out of date)
+    balanceMonitor.invalidate();
 
     throw err;
   }

@@ -22,6 +22,7 @@ import { blockrunProvider, setActiveProxy } from "./provider.js";
 import { startProxy } from "./proxy.js";
 import { resolveOrGenerateWalletKey } from "./auth.js";
 import type { RoutingConfig } from "./router/index.js";
+import { BalanceMonitor } from "./balance.js";
 
 /**
  * Start the x402 proxy in the background.
@@ -42,6 +43,21 @@ async function startProxyInBackground(api: OpenClawPluginApi): Promise<void> {
     api.logger.info(`Using wallet from BLOCKRUN_WALLET_KEY: ${address}`);
   }
 
+  // --- Startup balance check ---
+  const startupMonitor = new BalanceMonitor(address);
+  try {
+    const startupBalance = await startupMonitor.checkBalance();
+    if (startupBalance.isEmpty) {
+      api.logger.warn(`[!] No USDC balance. Fund wallet to use ClawRouter: ${address}`);
+    } else if (startupBalance.isLow) {
+      api.logger.warn(`[!] Low balance: ${startupBalance.balanceUSD} remaining. Fund wallet: ${address}`);
+    } else {
+      api.logger.info(`Wallet balance: ${startupBalance.balanceUSD}`);
+    }
+  } catch (err) {
+    api.logger.warn(`Could not check wallet balance: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   // Resolve routing config overrides from plugin config
   const routingConfig = api.pluginConfig?.routing as Partial<RoutingConfig> | undefined;
 
@@ -58,6 +74,12 @@ async function startProxyInBackground(api: OpenClawPluginApi): Promise<void> {
       const cost = decision.costEstimate.toFixed(4);
       const saved = (decision.savings * 100).toFixed(0);
       api.logger.info(`${decision.model} $${cost} (saved ${saved}%)`);
+    },
+    onLowBalance: (info) => {
+      api.logger.warn(`[!] Low balance: ${info.balanceUSD}. Fund wallet: ${info.walletAddress}`);
+    },
+    onInsufficientFunds: (info) => {
+      api.logger.error(`[!] Insufficient funds. Balance: ${info.balanceUSD}, Needed: ${info.requiredUSD}. Fund wallet: ${info.walletAddress}`);
     },
   });
 
@@ -92,6 +114,7 @@ export default plugin;
 
 // Re-export for programmatic use
 export { startProxy } from "./proxy.js";
+export type { ProxyOptions, ProxyHandle, LowBalanceInfo, InsufficientFundsInfo } from "./proxy.js";
 export { blockrunProvider } from "./provider.js";
 export { OPENCLAW_MODELS, BLOCKRUN_MODELS, buildProviderModels } from "./models.js";
 export { route, DEFAULT_ROUTING_CONFIG } from "./router/index.js";
@@ -104,3 +127,6 @@ export { PaymentCache } from "./payment-cache.js";
 export type { CachedPaymentParams } from "./payment-cache.js";
 export { createPaymentFetch } from "./x402.js";
 export type { PreAuthParams, PaymentFetchResult } from "./x402.js";
+export { BalanceMonitor, BALANCE_THRESHOLDS } from "./balance.js";
+export type { BalanceInfo, SufficiencyResult } from "./balance.js";
+export { InsufficientFundsError, EmptyWalletError, isInsufficientFundsError, isEmptyWalletError, isBalanceError } from "./errors.js";
