@@ -36,7 +36,7 @@ import {
 import { BLOCKRUN_MODELS } from "./models.js";
 import { logUsage, type UsageEntry } from "./logger.js";
 import { RequestDeduplicator } from "./dedup.js";
-import { BalanceMonitor, type BalanceInfo } from "./balance.js";
+import { BalanceMonitor } from "./balance.js";
 import { InsufficientFundsError, EmptyWalletError } from "./errors.js";
 
 const BLOCKRUN_API = "https://blockrun.ai/api";
