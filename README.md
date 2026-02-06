@@ -43,7 +43,7 @@ One wallet, 30+ models, zero API keys.
 openclaw plugin install @blockrun/clawrouter
 
 # 2. Fund your wallet with USDC on Base (address printed on install)
-#    $5 is enough for thousands of requests
+$5 is enough for thousands of requests
 
 # 3. Enable smart routing
 openclaw config set model blockrun/auto
