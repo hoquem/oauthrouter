@@ -148,10 +148,7 @@ for (const query of codeQueries) {
       config: DEFAULT_ROUTING_CONFIG,
       modelPricing,
     });
-    assertTrue(
-      ["MEDIUM", "COMPLEX", "REASONING"].includes(result.tier),
-      `Got ${result.tier}`
-    );
+    assertTrue(["MEDIUM", "COMPLEX", "REASONING"].includes(result.tier), `Got ${result.tier}`);
   });
 }
 
@@ -169,10 +166,7 @@ for (const query of complexQueries) {
       config: DEFAULT_ROUTING_CONFIG,
       modelPricing,
     });
-    assertTrue(
-      ["MEDIUM", "COMPLEX", "REASONING"].includes(result.tier),
-      `Got ${result.tier}`
-    );
+    assertTrue(["MEDIUM", "COMPLEX", "REASONING"].includes(result.tier), `Got ${result.tier}`);
   });
 }
 
@@ -180,7 +174,8 @@ console.log("\n═══ System Prompt Context ═══\n");
 
 test("System prompt affects routing", () => {
   const query = "Fix the bug";
-  const systemPrompt = "You are an expert software engineer. Analyze code carefully and provide detailed debugging steps with explanations.";
+  const systemPrompt =
+    "You are an expert software engineer. Analyze code carefully and provide detailed debugging steps with explanations.";
   const result = route(query, systemPrompt, 100, {
     config: DEFAULT_ROUTING_CONFIG,
     modelPricing,
@@ -296,7 +291,7 @@ test("SIMPLE tier selects a cheap model", () => {
   // SIMPLE tier should select a cost-effective model (deepseek or gemini-flash)
   assertTrue(
     result.model.includes("deepseek") || result.model.includes("gemini"),
-    `Got ${result.model}`
+    `Got ${result.model}`,
   );
 });
 
@@ -367,14 +362,19 @@ test("Emoji-heavy query", () => {
 });
 
 test("Code block in query", () => {
-  const result = route(`Fix this:
+  const result = route(
+    `Fix this:
 \`\`\`python
 def broken():
     return undefined
-\`\`\``, undefined, 100, {
-    config: DEFAULT_ROUTING_CONFIG,
-    modelPricing,
-  });
+\`\`\``,
+    undefined,
+    100,
+    {
+      config: DEFAULT_ROUTING_CONFIG,
+      modelPricing,
+    },
+  );
   assertTrue(["MEDIUM", "COMPLEX", "REASONING"].includes(result.tier), `Got ${result.tier}`);
 });
 
@@ -411,13 +411,18 @@ test("Only whitespace", () => {
 });
 
 test("Mixed code languages", () => {
-  const result = route(`Convert this Python to Rust:
+  const result = route(
+    `Convert this Python to Rust:
 def factorial(n):
     if n <= 1: return 1
-    return n * factorial(n-1)`, undefined, 100, {
-    config: DEFAULT_ROUTING_CONFIG,
-    modelPricing,
-  });
+    return n * factorial(n-1)`,
+    undefined,
+    100,
+    {
+      config: DEFAULT_ROUTING_CONFIG,
+      modelPricing,
+    },
+  );
   assertTrue(["MEDIUM", "COMPLEX", "REASONING"].includes(result.tier), `Got ${result.tier}`);
 });
 
@@ -561,7 +566,9 @@ await testAsync("Proxy starts on specified port", async () => {
   const proxy = await startProxy({
     walletKey: TEST_WALLET_KEY,
     port,
-    onReady: (p) => { readyPort = p; },
+    onReady: (p) => {
+      readyPort = p;
+    },
     onError: () => {},
   });
   assertEqual(readyPort, port);
@@ -648,9 +655,9 @@ await testAsync("Proxy handles concurrent health checks", async () => {
   });
 
   // Fire 10 concurrent health checks
-  const promises = Array(10).fill(null).map(() =>
-    fetch(`http://127.0.0.1:${port}/health`).then(r => r.json())
-  );
+  const promises = Array(10)
+    .fill(null)
+    .map(() => fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json()));
   const results = await Promise.all(promises);
 
   for (const data of results) {

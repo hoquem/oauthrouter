@@ -221,11 +221,11 @@ ClawRouter uses one environment variable: `BLOCKRUN_WALLET_KEY`
 
 ### Resolution Order
 
-| Priority | Source | Behavior |
-|----------|--------|----------|
-| 1st | Saved file (`~/.openclaw/blockrun/wallet.key`) | Used if exists |
-| 2nd | `BLOCKRUN_WALLET_KEY` env var | Used if no saved file |
-| 3rd | Auto-generate | Creates new wallet, saves to file |
+| Priority | Source                                         | Behavior                          |
+| -------- | ---------------------------------------------- | --------------------------------- |
+| 1st      | Saved file (`~/.openclaw/blockrun/wallet.key`) | Used if exists                    |
+| 2nd      | `BLOCKRUN_WALLET_KEY` env var                  | Used if no saved file             |
+| 3rd      | Auto-generate                                  | Creates new wallet, saves to file |
 
 **Important:** The saved file takes priority over the environment variable. If you have both, the env var is ignored.
 
@@ -252,6 +252,7 @@ curl http://localhost:8402/health | jq .wallet
 The saved file is checked first to ensure wallet persistence across sessions. Once a wallet is generated and funded, you don't want an accidentally-set env var to switch wallets and leave your funds inaccessible.
 
 If you explicitly want to use a different wallet:
+
 1. Delete `~/.openclaw/blockrun/wallet.key`
 2. Set `BLOCKRUN_WALLET_KEY=0x...`
 3. Restart OpenClaw
