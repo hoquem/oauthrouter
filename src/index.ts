@@ -59,7 +59,7 @@ function injectModelsConfig(logger: { info: (msg: string) => void }): void {
 
     writeFileSync(configPath, JSON.stringify(config, null, 2));
     logger.info("Injected BlockRun models into OpenClaw config");
-  } catch (err) {
+  } catch {
     // Silently fail — config injection is best-effort
   }
 }
