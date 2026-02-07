@@ -308,6 +308,14 @@ async function proxyRequest(
       modelId = (parsed.model as string) || "";
       maxTokens = (parsed.max_tokens as number) || 4096;
 
+      // Force stream: false — BlockRun API doesn't support streaming yet
+      // ClawRouter handles SSE heartbeat simulation for upstream compatibility
+      let bodyModified = false;
+      if (parsed.stream === true) {
+        parsed.stream = false;
+        bodyModified = true;
+      }
+
       if (parsed.model === AUTO_MODEL || parsed.model === AUTO_MODEL_SHORT) {
         // Extract prompt from messages
         type ChatMessage = { role: string; content: string };
@@ -330,9 +338,14 @@ async function proxyRequest(
         // Replace model in body
         parsed.model = routingDecision.model;
         modelId = routingDecision.model;
-        body = Buffer.from(JSON.stringify(parsed));
+        bodyModified = true;
 
         options.onRouted?.(routingDecision);
+      }
+
+      // Rebuild body if modified
+      if (bodyModified) {
+        body = Buffer.from(JSON.stringify(parsed));
       }
     } catch {
       // JSON parse error — forward body as-is
