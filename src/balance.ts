@@ -73,7 +73,9 @@ export class BalanceMonitor {
     this.walletAddress = walletAddress as `0x${string}`;
     this.client = createPublicClient({
       chain: base,
-      transport: http(),
+      transport: http(undefined, {
+        timeout: 10_000, // 10 second timeout to prevent hanging on slow RPC
+      }),
     });
   }
 

@@ -150,15 +150,7 @@ export const BLOCKRUN_MODELS: BlockRunModel[] = [
     maxOutput: 65536,
     reasoning: true,
   },
-  {
-    id: "openai/o4-mini",
-    name: "o4-mini",
-    inputPrice: 1.1,
-    outputPrice: 4.4,
-    contextWindow: 128000,
-    maxOutput: 65536,
-    reasoning: true,
-  },
+  // o4-mini: Placeholder removed - model not yet released by OpenAI
 
   // Anthropic
   {
