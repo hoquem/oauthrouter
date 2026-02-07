@@ -40,6 +40,34 @@ function canonicalize(obj: unknown): unknown {
   return sorted;
 }
 
+/**
+ * Strip OpenClaw-injected timestamps from message content.
+ * Format: [DAY YYYY-MM-DD HH:MM TZ] at the start of messages.
+ * Example: [SUN 2026-02-07 13:30 PST] Hello world
+ *
+ * This ensures requests with different timestamps but same content hash identically.
+ */
+const TIMESTAMP_PATTERN = /^\[\w{3}\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+\w+\]\s*/;
+
+function stripTimestamps(obj: unknown): unknown {
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(stripTimestamps);
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (key === "content" && typeof value === "string") {
+      // Strip timestamp prefix from message content
+      result[key] = value.replace(TIMESTAMP_PATTERN, "");
+    } else {
+      result[key] = stripTimestamps(value);
+    }
+  }
+  return result;
+}
+
 export class RequestDeduplicator {
   private inflight = new Map<string, InflightEntry>();
   private completed = new Map<string, CachedResponse>();
@@ -51,11 +79,14 @@ export class RequestDeduplicator {
 
   /** Hash request body to create a dedup key. */
   static hash(body: Buffer): string {
-    // Canonicalize JSON to ensure consistent hashing regardless of field order
+    // Canonicalize JSON to ensure consistent hashing regardless of field order.
+    // Also strip OpenClaw-injected timestamps so retries with different timestamps
+    // still match the same dedup key.
     let content = body;
     try {
       const parsed = JSON.parse(body.toString());
-      const canonical = canonicalize(parsed);
+      const stripped = stripTimestamps(parsed);
+      const canonical = canonicalize(stripped);
       content = Buffer.from(JSON.stringify(canonical));
     } catch {
       // Not valid JSON, use raw bytes
