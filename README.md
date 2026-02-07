@@ -47,15 +47,17 @@ One wallet, 30+ models, zero API keys.
 openclaw plugins install @blockrun/clawrouter
 
 # 2. Fund your wallet with USDC on Base (address printed on install)
-$5 is enough for thousands of requests
+# $5 is enough for thousands of requests
 
 # 3. Restart OpenClaw gateway to load the plugin
 openclaw gateway restart
 ```
 
-Every request now routes through BlockRun with x402 micropayments.
+Done! Use any model with `blockrun/` prefix (e.g., `blockrun/openai/gpt-4o`).
 
-**To enable smart routing**, add to `~/.openclaw/openclaw.json`:
+### Optional: Enable Smart Routing
+
+Automatically pick the cheapest model for each query. Add to `~/.openclaw/openclaw.json`:
 
 ```json
 {
@@ -71,9 +73,10 @@ Every request now routes through BlockRun with x402 micropayments.
 
 Or use `/model blockrun/auto` in any conversation to switch on the fly.
 
-Already have a funded wallet? `export BLOCKRUN_WALLET_KEY=0x...`
+### Tips
 
-Want a specific model? Use `blockrun/openai/gpt-4o` or `blockrun/anthropic/claude-sonnet-4` — still get x402 payments and usage logging.
+- **Already have a funded wallet?** `export BLOCKRUN_WALLET_KEY=0x...`
+- **Want a specific model?** Use `blockrun/openai/gpt-4o` or `blockrun/anthropic/claude-sonnet-4`
 
 ---
 
