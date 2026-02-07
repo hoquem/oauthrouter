@@ -420,7 +420,7 @@ Agents shouldn't need a human to paste API keys. They should generate a wallet, 
 ### Quick Checklist
 
 ```bash
-# 1. Check your version (should be 0.3.11+)
+# 1. Check your version (should be 0.3.12+)
 cat ~/.openclaw/extensions/clawrouter/package.json | grep version
 
 # 2. Check proxy is running
@@ -435,25 +435,13 @@ openclaw logs --follow
 
 Plugin isn't loaded or outdated. **Don't change the model name** — `blockrun/auto` is correct.
 
-**Fix:**
-
-```bash
-rm -rf ~/.openclaw/extensions/clawrouter
-openclaw plugins install @blockrun/clawrouter
-# Restart OpenClaw
-```
+**Fix:** See [How to Update ClawRouter](#how-to-update-clawrouter) for clean reinstall steps.
 
 ### "No API key found for provider blockrun"
 
 Version < 0.3.11 doesn't properly create auth profiles when the agents directory doesn't exist.
 
-**Fix:**
-
-```bash
-rm -rf ~/.openclaw/extensions/clawrouter
-openclaw plugins install @blockrun/clawrouter
-# Restart OpenClaw
-```
+**Fix:** See [How to Update ClawRouter](#how-to-update-clawrouter) for clean reinstall steps.
 
 After update, logs should show: `Injected BlockRun auth profile for agent: main`
 
@@ -466,17 +454,9 @@ echo '{"blockrun":{"profileId":"default","credential":{"apiKey":"x402-proxy-hand
 
 ### "Config validation failed: plugin not found: clawrouter"
 
-Plugin directory was removed but config still references it.
+Plugin directory was removed but config still references it. This blocks all OpenClaw commands until fixed.
 
-**Fix:**
-
-```bash
-# Edit ~/.openclaw/openclaw.json and remove "clawrouter" from:
-#   - plugins.entries
-#   - plugins.installs
-# Then reinstall:
-openclaw plugins install @blockrun/clawrouter
-```
+**Fix:** See [How to Update ClawRouter](#how-to-update-clawrouter) for complete cleanup steps.
 
 ### "No USDC balance" / "Insufficient funds"
 
@@ -498,12 +478,23 @@ lsof -i :8402
 
 ### How to Update ClawRouter
 
-Always do a clean reinstall:
+Always do a clean reinstall. **Important:** You must remove both the plugin files AND the config entries, otherwise OpenClaw will fail to validate the config.
 
 ```bash
+# 1. Remove plugin files
 rm -rf ~/.openclaw/extensions/clawrouter
+
+# 2. Remove stale config entries (required!)
+# Edit ~/.openclaw/openclaw.json and remove "clawrouter" from:
+#   - plugins.entries
+#   - plugins.installs
+# Or use this one-liner:
+node -e "const f='$HOME/.openclaw/openclaw.json';const c=require(f);delete c.plugins?.entries?.clawrouter;delete c.plugins?.installs?.clawrouter;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+
+# 3. Reinstall
 openclaw plugins install @blockrun/clawrouter
-# Restart OpenClaw
+
+# 4. Restart OpenClaw
 ```
 
 ### Verify Routing is Working
