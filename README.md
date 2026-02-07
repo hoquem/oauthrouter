@@ -43,40 +43,23 @@ One wallet, 30+ models, zero API keys.
 ## Quick Start (2 mins)
 
 ```bash
-# 1. Install — auto-generates a wallet on Base
-openclaw plugins install @blockrun/clawrouter
+# 1. Install with smart routing enabled by default
+curl -fsSL https://raw.githubusercontent.com/BlockRunAI/ClawRouter/main/scripts/reinstall.sh | bash
 
 # 2. Fund your wallet with USDC on Base (address printed on install)
 # $5 is enough for thousands of requests
 
-# 3. Restart OpenClaw gateway to load the plugin
+# 3. Restart OpenClaw gateway
 openclaw gateway restart
 ```
 
-Done! Use any model with `blockrun/` prefix (e.g., `blockrun/openai/gpt-4o`).
-
-### Optional: Enable Smart Routing
-
-Automatically pick the cheapest model for each query. Add to `~/.openclaw/openclaw.json`:
-
-```json
-{
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "blockrun/auto"
-      }
-    }
-  }
-}
-```
-
-Or use `/model blockrun/auto` in any conversation to switch on the fly.
+Done! Smart routing (`blockrun/auto`) is now your default model.
 
 ### Tips
 
-- **Already have a funded wallet?** `export BLOCKRUN_WALLET_KEY=0x...`
+- **Use `/model blockrun/auto`** in any conversation to switch on the fly
 - **Want a specific model?** Use `blockrun/openai/gpt-4o` or `blockrun/anthropic/claude-sonnet-4`
+- **Already have a funded wallet?** `export BLOCKRUN_WALLET_KEY=0x...`
 
 ---
 

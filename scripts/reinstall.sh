@@ -71,5 +71,35 @@ if (!store.profiles[profileKey]) {
 }
 "
 
+# 6. Enable smart routing by default
+echo "→ Enabling smart routing..."
+node -e "
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
+const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json');
+
+if (fs.existsSync(configPath)) {
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+
+    // Ensure agents.defaults.model.primary exists
+    if (!config.agents) config.agents = {};
+    if (!config.agents.defaults) config.agents.defaults = {};
+    if (!config.agents.defaults.model) config.agents.defaults.model = {};
+
+    // Set smart routing as default
+    config.agents.defaults.model.primary = 'blockrun/auto';
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    console.log('  Smart routing enabled: blockrun/auto');
+  } catch (e) {
+    console.log('  Could not update config:', e.message);
+  }
+} else {
+  console.log('  No openclaw.json found, skipping');
+}
+"
+
 echo ""
 echo "✓ Done! Run: openclaw gateway restart"
