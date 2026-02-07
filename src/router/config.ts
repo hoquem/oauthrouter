@@ -22,7 +22,10 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
 
   scoring: {
     tokenCountThresholds: { simple: 50, complex: 500 },
+
+    // Multilingual keywords: English + Chinese (中文) + Japanese (日本語) + Russian (Русский)
     codeKeywords: [
+      // English
       "function",
       "class",
       "import",
@@ -35,8 +38,35 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "var",
       "return",
       "```",
+      // Chinese
+      "函数",
+      "类",
+      "导入",
+      "定义",
+      "查询",
+      "异步",
+      "等待",
+      "常量",
+      "变量",
+      "返回",
+      // Japanese
+      "関数",
+      "クラス",
+      "インポート",
+      "非同期",
+      "定数",
+      "変数",
+      // Russian
+      "функция",
+      "класс",
+      "импорт",
+      "запрос",
+      "асинхронный",
+      "константа",
+      "переменная",
     ],
     reasoningKeywords: [
+      // English
       "prove",
       "theorem",
       "derive",
@@ -46,8 +76,33 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "mathematical",
       "proof",
       "logically",
+      // Chinese
+      "证明",
+      "定理",
+      "推导",
+      "逐步",
+      "思维链",
+      "形式化",
+      "数学",
+      "逻辑",
+      // Japanese
+      "証明",
+      "定理",
+      "導出",
+      "ステップバイステップ",
+      "論理的",
+      // Russian
+      "доказать",
+      "теорема",
+      "вывести",
+      "шаг за шагом",
+      "цепочка рассуждений",
+      "формально",
+      "математически",
+      "логически",
     ],
     simpleKeywords: [
+      // English
       "what is",
       "define",
       "translate",
@@ -57,8 +112,36 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "how old",
       "who is",
       "when was",
+      // Chinese
+      "什么是",
+      "定义",
+      "翻译",
+      "你好",
+      "是否",
+      "首都",
+      "多大",
+      "谁是",
+      "何时",
+      // Japanese
+      "とは",
+      "定義",
+      "翻訳",
+      "こんにちは",
+      "はいかいいえ",
+      "首都",
+      "誰",
+      // Russian
+      "что такое",
+      "определение",
+      "перевести",
+      "привет",
+      "да или нет",
+      "столица",
+      "кто такой",
+      "когда",
     ],
     technicalKeywords: [
+      // English
       "algorithm",
       "optimize",
       "architecture",
@@ -67,11 +150,67 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "microservice",
       "database",
       "infrastructure",
+      // Chinese
+      "算法",
+      "优化",
+      "架构",
+      "分布式",
+      "微服务",
+      "数据库",
+      "基础设施",
+      // Japanese
+      "アルゴリズム",
+      "最適化",
+      "アーキテクチャ",
+      "分散",
+      "マイクロサービス",
+      "データベース",
+      // Russian
+      "алгоритм",
+      "оптимизировать",
+      "архитектура",
+      "распределённый",
+      "микросервис",
+      "база данных",
+      "инфраструктура",
     ],
-    creativeKeywords: ["story", "poem", "compose", "brainstorm", "creative", "imagine", "write a"],
+    creativeKeywords: [
+      // English
+      "story",
+      "poem",
+      "compose",
+      "brainstorm",
+      "creative",
+      "imagine",
+      "write a",
+      // Chinese
+      "故事",
+      "诗",
+      "创作",
+      "头脑风暴",
+      "创意",
+      "想象",
+      "写一个",
+      // Japanese
+      "物語",
+      "詩",
+      "作曲",
+      "ブレインストーム",
+      "創造的",
+      "想像",
+      // Russian
+      "история",
+      "стихотворение",
+      "сочинить",
+      "мозговой штурм",
+      "творческий",
+      "представить",
+      "напиши",
+    ],
 
-    // New dimension keyword lists
+    // New dimension keyword lists (multilingual)
     imperativeVerbs: [
+      // English
       "build",
       "create",
       "implement",
@@ -82,8 +221,37 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "deploy",
       "configure",
       "set up",
+      // Chinese
+      "构建",
+      "创建",
+      "实现",
+      "设计",
+      "开发",
+      "生成",
+      "部署",
+      "配置",
+      "设置",
+      // Japanese
+      "構築",
+      "作成",
+      "実装",
+      "設計",
+      "開発",
+      "生成",
+      "デプロイ",
+      "設定",
+      // Russian
+      "построить",
+      "создать",
+      "реализовать",
+      "спроектировать",
+      "разработать",
+      "сгенерировать",
+      "развернуть",
+      "настроить",
     ],
     constraintIndicators: [
+      // English
       "under",
       "at most",
       "at least",
@@ -94,8 +262,31 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "minimum",
       "limit",
       "budget",
+      // Chinese
+      "不超过",
+      "至少",
+      "最多",
+      "在内",
+      "最大",
+      "最小",
+      "限制",
+      "预算",
+      // Japanese
+      "以下",
+      "最大",
+      "最小",
+      "制限",
+      "予算",
+      // Russian
+      "не более",
+      "как минимум",
+      "максимум",
+      "минимум",
+      "ограничение",
+      "бюджет",
     ],
     outputFormatKeywords: [
+      // English
       "json",
       "yaml",
       "xml",
@@ -105,8 +296,21 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "schema",
       "format as",
       "structured",
+      // Chinese
+      "表格",
+      "格式化为",
+      "结构化",
+      // Japanese
+      "テーブル",
+      "フォーマット",
+      "構造化",
+      // Russian
+      "таблица",
+      "форматировать как",
+      "структурированный",
     ],
     referenceKeywords: [
+      // English
       "above",
       "below",
       "previous",
@@ -116,8 +320,32 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "the code",
       "earlier",
       "attached",
+      // Chinese
+      "上面",
+      "下面",
+      "之前",
+      "接下来",
+      "文档",
+      "代码",
+      "附件",
+      // Japanese
+      "上記",
+      "下記",
+      "前の",
+      "次の",
+      "ドキュメント",
+      "コード",
+      // Russian
+      "выше",
+      "ниже",
+      "предыдущий",
+      "следующий",
+      "документация",
+      "код",
+      "вложение",
     ],
     negationKeywords: [
+      // English
       "don't",
       "do not",
       "avoid",
@@ -126,8 +354,29 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "except",
       "exclude",
       "no longer",
+      // Chinese
+      "不要",
+      "避免",
+      "从不",
+      "没有",
+      "除了",
+      "排除",
+      // Japanese
+      "しないで",
+      "避ける",
+      "決して",
+      "なしで",
+      "除く",
+      // Russian
+      "не делай",
+      "избегать",
+      "никогда",
+      "без",
+      "кроме",
+      "исключить",
     ],
     domainSpecificKeywords: [
+      // English
       "quantum",
       "fpga",
       "vlsi",
@@ -140,6 +389,28 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "homomorphic",
       "zero-knowledge",
       "lattice-based",
+      // Chinese
+      "量子",
+      "光子学",
+      "基因组学",
+      "蛋白质组学",
+      "拓扑",
+      "同态",
+      "零知识",
+      "格密码",
+      // Japanese
+      "量子",
+      "フォトニクス",
+      "ゲノミクス",
+      "トポロジカル",
+      // Russian
+      "квантовый",
+      "фотоника",
+      "геномика",
+      "протеомика",
+      "топологический",
+      "гомоморфный",
+      "с нулевым разглашением",
     ],
 
     // Dimension weights (sum to 1.0)

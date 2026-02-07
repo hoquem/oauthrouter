@@ -201,6 +201,61 @@ const config = DEFAULT_ROUTING_CONFIG;
   );
 }
 
+// Multilingual keyword tests
+{
+  console.log("\nMultilingual keyword tests:");
+
+  // Chinese reasoning - 证明 (prove) + 逐步 (step by step)
+  const zhReasoning = classifyByRules(
+    "请证明根号2是无理数，逐步推导",
+    undefined,
+    20,
+    config.scoring,
+  );
+  assert(
+    zhReasoning.tier === "REASONING",
+    `Chinese "证明...逐步" → ${zhReasoning.tier} (should be REASONING)`,
+  );
+
+  // Chinese simple - 你好 (hello) + 什么是 (what is)
+  const zhSimple = classifyByRules("你好，什么是人工智能？", undefined, 15, config.scoring);
+  assert(
+    zhSimple.tier === "SIMPLE",
+    `Chinese "你好...什么是" → ${zhSimple.tier} (should be SIMPLE)`,
+  );
+
+  // Japanese simple - こんにちは (hello)
+  const jaSimple = classifyByRules("こんにちは、東京とは何ですか", undefined, 15, config.scoring);
+  assert(
+    jaSimple.tier === "SIMPLE",
+    `Japanese "こんにちは...とは" → ${jaSimple.tier} (should be SIMPLE)`,
+  );
+
+  // Russian technical - алгоритм (algorithm) + оптимизировать (optimize)
+  const ruTech = classifyByRules(
+    "Оптимизировать алгоритм сортировки для распределённой системы",
+    undefined,
+    20,
+    config.scoring,
+  );
+  assert(
+    ruTech.tier !== "SIMPLE",
+    `Russian "алгоритм...распределённой" → ${ruTech.tier} (should NOT be SIMPLE)`,
+  );
+
+  // Russian simple - привет (hello) + что такое (what is)
+  const ruSimple = classifyByRules(
+    "Привет, что такое машинное обучение?",
+    undefined,
+    15,
+    config.scoring,
+  );
+  assert(
+    ruSimple.tier === "SIMPLE",
+    `Russian "привет...что такое" → ${ruSimple.tier} (should be SIMPLE)`,
+  );
+}
+
 // Override: large context
 {
   console.log("\nOverride: large context:");

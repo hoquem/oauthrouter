@@ -115,6 +115,19 @@ No external classifier calls. Ambiguous queries default to the MEDIUM tier (Deep
 
 Weighted sum → sigmoid confidence calibration → tier selection.
 
+### Supported Languages
+
+ClawRouter's keyword-based routing works with prompts in:
+
+| Language              | Script       | Examples                       |
+| --------------------- | ------------ | ------------------------------ |
+| **English**           | Latin        | Full support (default)         |
+| **Chinese (中文)**    | Han/CJK      | 证明, 定理, 你好, 什么是       |
+| **Japanese (日本語)** | Kanji + Kana | 証明, こんにちは, アルゴリズム |
+| **Russian (Русский)** | Cyrillic     | доказать, привет, алгоритм     |
+
+Mixed-language prompts are supported — keywords from all languages are checked simultaneously.
+
 ### Tier → Model Mapping
 
 | Tier      | Primary Model     | Cost/M | Savings vs Opus |
