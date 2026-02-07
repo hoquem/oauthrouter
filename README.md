@@ -49,8 +49,8 @@ openclaw plugins install @blockrun/clawrouter
 # 2. Fund your wallet with USDC on Base (address printed on install)
 $5 is enough for thousands of requests
 
-# 3. Restart OpenClaw to load the plugin
-openclaw restart
+# 3. Restart OpenClaw gateway to load the plugin
+openclaw gateway restart
 ```
 
 Every request now routes through BlockRun with x402 micropayments.
