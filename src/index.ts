@@ -232,7 +232,7 @@ const plugin: OpenClawPluginDefinition = {
   id: "clawrouter",
   name: "ClawRouter",
   description: "Smart LLM router — 30+ models, x402 micropayments, 78% cost savings",
-  version: "0.3.14",
+  version: "0.3.15",
 
   register(api: OpenClawPluginApi) {
     // Skip heavy initialization in completion mode — only completion script is needed

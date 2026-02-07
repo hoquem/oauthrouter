@@ -478,26 +478,8 @@ lsof -i :8402
 
 ### How to Update ClawRouter
 
-Always do a clean reinstall. **Important:** You must remove both the plugin files AND the config entries, otherwise OpenClaw will fail to validate the config.
-
 ```bash
-# 1. Remove plugin files
-rm -rf ~/.openclaw/extensions/clawrouter
-
-# 2. Remove stale config entries (required!)
-# Edit ~/.openclaw/openclaw.json and remove "clawrouter" from:
-#   - plugins.entries
-#   - plugins.installs
-# Or use this one-liner:
-node -e "const f='$HOME/.openclaw/openclaw.json';const c=require(f);delete c.plugins?.entries?.clawrouter;delete c.plugins?.installs?.clawrouter;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
-
-# 3. Kill old proxy (if running)
-lsof -ti :8402 | xargs kill -9 2>/dev/null || true
-
-# 4. Reinstall
-openclaw plugins install @blockrun/clawrouter
-
-# 5. Restart OpenClaw
+curl -fsSL https://raw.githubusercontent.com/BlockRunAI/ClawRouter/main/scripts/reinstall.sh | bash
 openclaw gateway restart
 ```
 
