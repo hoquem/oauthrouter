@@ -317,11 +317,16 @@ async function proxyRequest(
       }
 
       // Normalize model name for comparison (trim whitespace, lowercase)
-      const normalizedModel = typeof parsed.model === "string" ? parsed.model.trim().toLowerCase() : "";
-      const isAutoModel = normalizedModel === AUTO_MODEL.toLowerCase() || normalizedModel === AUTO_MODEL_SHORT.toLowerCase();
+      const normalizedModel =
+        typeof parsed.model === "string" ? parsed.model.trim().toLowerCase() : "";
+      const isAutoModel =
+        normalizedModel === AUTO_MODEL.toLowerCase() ||
+        normalizedModel === AUTO_MODEL_SHORT.toLowerCase();
 
       // Debug: log received model name
-      console.log(`[ClawRouter] Received model: "${parsed.model}" -> normalized: "${normalizedModel}", isAuto: ${isAutoModel}`);
+      console.log(
+        `[ClawRouter] Received model: "${parsed.model}" -> normalized: "${normalizedModel}", isAuto: ${isAutoModel}`,
+      );
 
       if (isAutoModel) {
         // Extract prompt from messages

@@ -124,7 +124,10 @@ function injectAuthProfile(logger: { info: (msg: string) => void }): void {
 
       // Load or create auth-profiles.json with correct OpenClaw format
       // Format: { version: 1, profiles: { "provider:profileId": { type, provider, key } } }
-      let store: { version: number; profiles: Record<string, unknown> } = { version: 1, profiles: {} };
+      let store: { version: number; profiles: Record<string, unknown> } = {
+        version: 1,
+        profiles: {},
+      };
       if (existsSync(authPath)) {
         try {
           const existing = JSON.parse(readFileSync(authPath, "utf-8"));
@@ -219,7 +222,9 @@ async function startProxyInBackground(api: OpenClawPluginApi): Promise<void> {
     onRouted: (decision) => {
       const cost = decision.costEstimate.toFixed(4);
       const saved = (decision.savings * 100).toFixed(0);
-      api.logger.info(`${decision.model} $${cost} (saved ${saved}%)`);
+      api.logger.info(
+        `[${decision.tier}] ${decision.model} $${cost} (saved ${saved}%) | ${decision.reasoning}`,
+      );
     },
     onLowBalance: (info) => {
       api.logger.warn(`[!] Low balance: ${info.balanceUSD}. Fund wallet: ${info.walletAddress}`);

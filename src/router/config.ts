@@ -187,8 +187,8 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       fallback: ["anthropic/claude-sonnet-4", "openai/gpt-4o"],
     },
     REASONING: {
-      primary: "openai/o3",
-      fallback: ["google/gemini-2.5-pro", "anthropic/claude-sonnet-4"],
+      primary: "deepseek/deepseek-reasoner",
+      fallback: ["moonshot/kimi-k2.5", "google/gemini-2.5-pro"],
     },
   },
 

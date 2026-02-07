@@ -80,6 +80,8 @@ export function classifyByRules(
   config: ScoringConfig,
 ): ScoringResult {
   const text = `${systemPrompt ?? ""} ${prompt}`.toLowerCase();
+  // User prompt only — used for reasoning markers (system prompt shouldn't influence complexity)
+  const userText = prompt.toLowerCase();
 
   // Score all 14 dimensions
   const dimensions: DimensionScore[] = [
@@ -93,8 +95,9 @@ export function classifyByRules(
       { low: 1, high: 2 },
       { none: 0, low: 0.5, high: 1.0 },
     ),
+    // Reasoning markers use USER prompt only — system prompt "step by step" shouldn't trigger reasoning
     scoreKeywordMatch(
-      text,
+      userText,
       config.reasoningKeywords,
       "reasoningMarkers",
       "reasoning",
@@ -190,8 +193,11 @@ export function classifyByRules(
     weightedScore += d.score * w;
   }
 
-  // Count reasoning markers for override
-  const reasoningMatches = config.reasoningKeywords.filter((kw) => text.includes(kw.toLowerCase()));
+  // Count reasoning markers for override — only check USER prompt, not system prompt
+  // This prevents system prompts with "step by step" from triggering REASONING for simple queries
+  const reasoningMatches = config.reasoningKeywords.filter((kw) =>
+    userText.includes(kw.toLowerCase()),
+  );
 
   // Direct reasoning override: 2+ reasoning markers = high confidence REASONING
   if (reasoningMatches.length >= 2) {

@@ -75,6 +75,43 @@ const config = DEFAULT_ROUTING_CONFIG;
   );
 }
 
+// System prompt with reasoning keywords should NOT trigger REASONING for simple queries
+// This was a bug: if client's system prompt had "step by step" or "logically", ALL queries became REASONING
+{
+  console.log("\nSystem prompt with reasoning keywords (should NOT affect simple queries):");
+  const systemPrompt = "Think step by step and reason logically about the user's question.";
+
+  const r1 = classifyByRules("What is 2+2?", systemPrompt, 10, config.scoring);
+  assert(
+    r1.tier === "SIMPLE",
+    `"2+2" with reasoning system prompt → ${r1.tier} (should be SIMPLE)`,
+  );
+
+  const r2 = classifyByRules("Hello", systemPrompt, 5, config.scoring);
+  assert(
+    r2.tier === "SIMPLE",
+    `"Hello" with reasoning system prompt → ${r2.tier} (should be SIMPLE)`,
+  );
+
+  const r3 = classifyByRules("What is the capital of France?", systemPrompt, 12, config.scoring);
+  assert(
+    r3.tier === "SIMPLE",
+    `"Capital of France" with reasoning system prompt → ${r3.tier} (should be SIMPLE)`,
+  );
+
+  // But if USER explicitly asks for step-by-step, it SHOULD trigger REASONING
+  const r4 = classifyByRules(
+    "Prove step by step that sqrt(2) is irrational",
+    systemPrompt,
+    50,
+    config.scoring,
+  );
+  assert(
+    r4.tier === "REASONING",
+    `User asks for step-by-step proof → ${r4.tier} (should be REASONING)`,
+  );
+}
+
 // Medium queries (may be ambiguous — that's ok, LLM classifier handles them)
 {
   console.log("\nMedium/Ambiguous queries:");

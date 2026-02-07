@@ -22,7 +22,7 @@ One wallet, 30+ models, zero API keys.
 "What is 2+2?"            → DeepSeek        $0.27/M    saved 99%
 "Summarize this article"  → GPT-4o-mini     $0.60/M    saved 99%
 "Build a React component" → Claude Sonnet   $15.00/M   best balance
-"Prove this theorem"      → o3              $10.00/M   reasoning
+"Prove this theorem"      → DeepSeek-R      $0.42/M    reasoning
 "Run 50 parallel searches"→ Kimi K2.5       $2.40/M    agentic swarm
 ```
 
@@ -117,12 +117,12 @@ Weighted sum → sigmoid confidence calibration → tier selection.
 
 ### Tier → Model Mapping
 
-| Tier      | Primary Model   | Cost/M | Savings vs Opus |
-| --------- | --------------- | ------ | --------------- |
-| SIMPLE    | deepseek-chat   | $0.27  | **99.6%**       |
-| MEDIUM    | gpt-4o-mini     | $0.60  | **99.2%**       |
-| COMPLEX   | claude-sonnet-4 | $15.00 | **80%**         |
-| REASONING | o3              | $10.00 | **87%**         |
+| Tier      | Primary Model     | Cost/M | Savings vs Opus |
+| --------- | ----------------- | ------ | --------------- |
+| SIMPLE    | gemini-2.5-flash  | $0.60  | **99.2%**       |
+| MEDIUM    | deepseek-chat     | $0.42  | **99.4%**       |
+| COMPLEX   | claude-opus-4     | $75.00 | baseline        |
+| REASONING | deepseek-reasoner | $0.42  | **99.4%**       |
 
 Special rule: 2+ reasoning markers → REASONING at 0.97 confidence.
 
@@ -365,12 +365,12 @@ const decision = route("Prove sqrt(2) is irrational", undefined, 4096, {
 
 console.log(decision);
 // {
-//   model: "openai/o3",
+//   model: "deepseek/deepseek-reasoner",
 //   tier: "REASONING",
 //   confidence: 0.97,
 //   method: "rules",
-//   savings: 0.87,
-//   costEstimate: 0.041,
+//   savings: 0.994,
+//   costEstimate: 0.002,
 // }
 ```
 
@@ -471,9 +471,9 @@ openclaw logs --follow
 You should see model selection for each request:
 
 ```
-[plugins] google/gemini-2.5-flash $0.0012 (saved 99%)
-[plugins] deepseek/deepseek-chat $0.0003 (saved 99%)
-[plugins] anthropic/claude-sonnet-4 $0.0450 (saved 80%)
+[plugins] [SIMPLE] google/gemini-2.5-flash $0.0012 (saved 99%)
+[plugins] [MEDIUM] deepseek/deepseek-chat $0.0003 (saved 99%)
+[plugins] [REASONING] deepseek/deepseek-reasoner $0.0005 (saved 99%)
 ```
 
 ---
