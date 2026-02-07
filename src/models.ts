@@ -23,8 +23,9 @@ type BlockRunModel = {
 
 export const BLOCKRUN_MODELS: BlockRunModel[] = [
   // Smart routing meta-model — proxy replaces with actual model
+  // NOTE: Model IDs are WITHOUT provider prefix (OpenClaw adds "blockrun/" automatically)
   {
-    id: "blockrun/auto",
+    id: "auto",
     name: "BlockRun Smart Router",
     inputPrice: 0,
     outputPrice: 0,
