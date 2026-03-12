@@ -21,7 +21,7 @@ test("returns Codex model for MEDIUM tier", () => {
 });
 
 test("returns null for unknown provider", () => {
-  const model = canonicalModelForProviderTier("google", "SIMPLE");
+  const model = canonicalModelForProviderTier("acme-llm", "SIMPLE");
   assert.equal(model, null);
 });
 

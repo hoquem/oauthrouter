@@ -34,6 +34,12 @@ import {
   toOpenAICodexModelId,
 } from "./adapters/openai-codex.js";
 import { normalizeDeepSeekChatCompletionsRequest } from "./adapters/deepseek.js";
+import {
+  toGoogleModelId,
+  buildGoogleGenerateContentRequest,
+  googleGenerateContentResponseToOpenAIChatCompletion,
+  type GoogleGenerateContentResponse,
+} from "./adapters/google.js";
 import { ProviderHealthManager, type ProviderTier, tierFromModelId } from "./provider-health.js";
 import { resolveProviderForModelId, isAutoModelId, type ProviderId } from "./model-registry.js";
 import { route, DEFAULT_ROUTING_CONFIG } from "./router/index.js";
@@ -998,6 +1004,15 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
         max_tokens: 1,
       } as OpenAIChatCompletionsRequest;
       body = JSON.stringify(normalizeDeepSeekChatCompletionsRequest(oa));
+    } else if (provider === "google") {
+      const googleModelId = toGoogleModelId(modelId);
+      url = `${urlBase}/v1beta/models/${googleModelId}:generateContent`;
+      const oa = {
+        model: modelId,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+      } as OpenAIChatCompletionsRequest;
+      body = JSON.stringify(buildGoogleGenerateContentRequest(oa));
     } else if (provider === "openai") {
       const oa = {
         model: modelId,
@@ -1853,6 +1868,153 @@ async function proxyRequest(
     upstreamBody = Buffer.from(JSON.stringify(normalized));
   }
 
+  if (provider === "google" && isChatCompletions && body.length > 0) {
+    const openAiReq = JSON.parse(body.toString()) as OpenAIChatCompletionsRequest;
+    // If auto rewrote the model in `parsed`, keep the raw request consistent.
+    if (typeof modelId === "string" && modelId.trim()) openAiReq.model = modelId;
+
+    const clientStream = Boolean((openAiReq as any).stream);
+    const requestedModel = typeof openAiReq.model === "string" ? openAiReq.model : undefined;
+    const googleModelId = toGoogleModelId(requestedModel ?? "gemini-2.5-flash");
+
+    const googleReq = buildGoogleGenerateContentRequest(openAiReq);
+    upstreamBody = Buffer.from(JSON.stringify(googleReq));
+
+    if (clientStream) {
+      upstreamPath = `/v1beta/models/${googleModelId}:streamGenerateContent?alt=sse`;
+
+      responseStreamMapper = async (upstream, nodeRes) => {
+        if (!upstream.ok) {
+          const raw = await upstream.text();
+          console.error(`[google-err] status=${upstream.status} body=${raw.substring(0, 300)}`);
+          nodeRes.writeHead(upstream.status, { "content-type": "application/json" });
+          nodeRes.end(raw);
+          return;
+        }
+
+        nodeRes.writeHead(200, {
+          "content-type": "text/event-stream; charset=utf-8",
+          "cache-control": "no-cache, no-transform",
+        });
+
+        if (!upstream.body) {
+          nodeRes.write("data: [DONE]\n\n");
+          nodeRes.end();
+          return;
+        }
+
+        const created = Math.floor(Date.now() / 1000);
+        const idFallback = `chatcmpl_${randomBytes(12).toString("hex")}`;
+        let toolCallIndex = -1;
+        let promptTokens = 0;
+        let completionTokens = 0;
+
+        for await (const frame of readSseDataFrames(upstream.body)) {
+          if (frame.data === "[DONE]") break;
+          const payload = tryParseJson<GoogleGenerateContentResponse>(frame.data);
+          if (!payload) continue;
+
+          if (payload.usageMetadata?.promptTokenCount) {
+            promptTokens = payload.usageMetadata.promptTokenCount;
+          }
+          if (payload.usageMetadata?.candidatesTokenCount) {
+            completionTokens = payload.usageMetadata.candidatesTokenCount;
+          }
+
+          const candidate = payload.candidates?.[0];
+          const parts = candidate?.content?.parts ?? [];
+
+          for (const part of parts) {
+            if ("text" in part && typeof part.text === "string") {
+              const chunk = {
+                id: idFallback,
+                object: "chat.completion.chunk",
+                created,
+                model: requestedModel,
+                choices: [{ index: 0, delta: { content: part.text }, finish_reason: null }],
+              };
+              nodeRes.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            } else if ("functionCall" in part) {
+              toolCallIndex++;
+              const fc = part.functionCall;
+              const chunk = {
+                id: idFallback,
+                object: "chat.completion.chunk",
+                created,
+                model: requestedModel,
+                choices: [
+                  {
+                    index: 0,
+                    delta: {
+                      tool_calls: [
+                        {
+                          index: toolCallIndex,
+                          id: `call_${created}_${toolCallIndex}`,
+                          type: "function",
+                          function: { name: fc.name, arguments: JSON.stringify(fc.args ?? {}) },
+                        },
+                      ],
+                    },
+                    finish_reason: null,
+                  },
+                ],
+              };
+              nodeRes.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            }
+          }
+
+          if (candidate?.finishReason) {
+            const finishReason =
+              candidate.finishReason === "TOOL_CALL"
+                ? "tool_calls"
+                : candidate.finishReason === "STOP"
+                  ? "stop"
+                  : candidate.finishReason === "MAX_TOKENS"
+                    ? "length"
+                    : "stop";
+            const chunk: Record<string, unknown> = {
+              id: idFallback,
+              object: "chat.completion.chunk",
+              created,
+              model: requestedModel,
+              choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
+            };
+            if (promptTokens > 0 || completionTokens > 0) {
+              chunk.usage = {
+                prompt_tokens: promptTokens,
+                completion_tokens: completionTokens,
+                total_tokens: promptTokens + completionTokens,
+              };
+            }
+            nodeRes.write(`data: ${JSON.stringify(chunk)}\n\n`);
+          }
+        }
+        nodeRes.write("data: [DONE]\n\n");
+        nodeRes.end();
+      };
+    } else {
+      upstreamPath = `/v1beta/models/${googleModelId}:generateContent`;
+      responseMapper = async (upstream) => {
+        const raw = await upstream.text();
+        if (!upstream.ok) {
+          return {
+            status: upstream.status,
+            headers: { "content-type": "application/json" },
+            body: Buffer.from(raw),
+          };
+        }
+        const mapped = googleGenerateContentResponseToOpenAIChatCompletion(JSON.parse(raw), {
+          requestedModel,
+        });
+        return {
+          status: 200,
+          headers: { "content-type": "application/json" },
+          body: Buffer.from(JSON.stringify(mapped)),
+        };
+      };
+    }
+  }
+
   // openai-codex (chatgpt.com) adapter: OpenAI /v1/responses passthrough -> Codex responses
   if (provider === "openai-codex" && isResponses) {
     if (body.length === 0) throw new Error("Empty request body");
@@ -2506,6 +2668,33 @@ async function proxyRequest(
               };
             };
           }
+        } else if (toProvider === "google") {
+          // Google Generative AI fallback: translate to generateContent format.
+          const requestedModel = typeof openAiReq.model === "string" ? openAiReq.model : undefined;
+          const googleModelId = toGoogleModelId(requestedModel ?? "gemini-2.5-flash");
+          const googleReq = buildGoogleGenerateContentRequest(openAiReq);
+          fbPath = `/v1beta/models/${googleModelId}:generateContent`;
+          fbBody = Buffer.from(JSON.stringify(googleReq));
+
+          fbMapper = async (upstreamRsp) => {
+            const raw = await upstreamRsp.text();
+            if (!upstreamRsp.ok) {
+              return {
+                status: upstreamRsp.status,
+                headers: { "content-type": "application/json" },
+                body: Buffer.from(raw),
+              };
+            }
+            const mapped = googleGenerateContentResponseToOpenAIChatCompletion(
+              JSON.parse(raw) as GoogleGenerateContentResponse,
+              { requestedModel },
+            );
+            return {
+              status: 200,
+              headers: { "content-type": "application/json" },
+              body: Buffer.from(JSON.stringify(mapped)),
+            };
+          };
         } else {
           // OpenAI-compatible providers: /v1/chat/completions passthrough with model normalization.
           const normalized =

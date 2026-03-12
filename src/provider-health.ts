@@ -27,6 +27,11 @@ export function tierFromModelId(modelId: string | null | undefined): ProviderTie
   if (m.includes("gpt-5.2")) return "MEDIUM";
   if (m.includes("gpt-5.1")) return "MEDIUM";
 
+  // Google Gemini
+  if (m.includes("gemini-2.5-flash") || m.includes("gemini-2.0-flash")) return "SIMPLE";
+  if (m.includes("gemini-2.5-pro") || m.includes("gemini-2.0-pro")) return "COMPLEX";
+  if (m.includes("gemini-3-pro")) return "REASONING";
+
   return "UNKNOWN";
 }
 

@@ -37,6 +37,7 @@ export {
   canonicalModelForProviderTier,
   ANTHROPIC_TO_CODEX_FALLBACK_MODEL_MAP,
   ANTHROPIC_TO_DEEPSEEK_FALLBACK_MODEL_MAP,
+  ANTHROPIC_TO_GOOGLE_FALLBACK_MODEL_MAP,
   buildDefaultRateLimitFallbackChain,
 } from "./fallback-config.js";
 export {
@@ -54,6 +55,15 @@ export {
 // Internal mappers (exported for unit tests).
 export { createCodexSseToChatCompletionsMapper } from "./codex-sse-mapper.js";
 export { normalizeDeepSeekChatCompletionsRequest, toDeepSeekModelId } from "./adapters/deepseek.js";
+export {
+  toGoogleModelId,
+  buildGoogleGenerateContentRequest,
+  googleGenerateContentResponseToOpenAIChatCompletion,
+} from "./adapters/google.js";
+export type {
+  GoogleGenerateContentRequest,
+  GoogleGenerateContentResponse,
+} from "./adapters/google.js";
 export { ProviderHealthManager, tierFromModelId } from "./provider-health.js";
 
 // Adapter exports (for unit tests).

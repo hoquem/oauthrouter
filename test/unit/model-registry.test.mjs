@@ -21,7 +21,7 @@ test("resolves deepseek/ prefix", () => {
 });
 
 test("returns null for unknown prefix", () => {
-  assert.equal(resolveProviderForModelId("google/gemini-2"), null);
+  assert.equal(resolveProviderForModelId("acme-llm/some-model"), null);
 });
 
 test("returns null for unprefixed model", () => {

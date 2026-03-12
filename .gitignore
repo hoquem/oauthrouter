@@ -3,3 +3,8 @@ dist/
 coverage/
 *.tsbuildinfo
 .DS_Store
+
+# Local dev files
+config.local.json
+start-local.mjs
+run.mjs
