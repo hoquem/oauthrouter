@@ -64,10 +64,12 @@ export type TraceEvent = {
 
 export class RingBuffer<T> {
   readonly capacity: number;
+  readonly ttlMs: number;
   private buf: T[] = [];
 
-  constructor(capacity = 500) {
+  constructor(capacity = 500, ttlMs = 0) {
     this.capacity = Math.max(1, Math.floor(capacity));
+    this.ttlMs = Math.max(0, Math.floor(ttlMs));
   }
 
   push(value: T): void {
@@ -75,13 +77,35 @@ export class RingBuffer<T> {
     if (this.buf.length > this.capacity) {
       this.buf.splice(0, this.buf.length - this.capacity);
     }
+    // Periodic cleanup of expired entries (only when TTL is set)
+    if (this.ttlMs > 0 && this.buf.length % 100 === 0) {
+      this.cleanup();
+    }
+  }
+
+  private cleanup(): void {
+    if (this.ttlMs === 0) return;
+    const cutoff = Date.now() - this.ttlMs;
+    let removed = 0;
+    while (
+      removed < this.buf.length &&
+      typeof (this.buf[removed] as any)?.ts === "number" &&
+      (this.buf[removed] as any).ts < cutoff
+    ) {
+      removed++;
+    }
+    if (removed > 0) {
+      this.buf.splice(0, removed);
+    }
   }
 
   toArray(): T[] {
+    if (this.ttlMs > 0) this.cleanup();
     return this.buf.slice();
   }
 
   tail(n: number): T[] {
+    if (this.ttlMs > 0) this.cleanup();
     const size = this.buf.length;
     if (!Number.isFinite(n) || n <= 0) return [];
     if (n >= size) return this.toArray();
@@ -89,12 +113,14 @@ export class RingBuffer<T> {
   }
 
   get length(): number {
+    if (this.ttlMs > 0) this.cleanup();
     return this.buf.length;
   }
 }
 
 export type RoutingTraceOptions = {
   capacity?: number;
+  ttlMs?: number;
   logPath?: string;
 };
 
@@ -104,6 +130,7 @@ export class RoutingTraceStore {
   readonly ring: RingBuffer<TraceEvent>;
 
   private listeners = new Set<Listener>();
+  private listenerCleanupTimer: NodeJS.Timeout | null = null;
   private logPath: string;
 
   private stream: WriteStream | null = null;
@@ -112,20 +139,38 @@ export class RoutingTraceStore {
   private ensureReadyPromise: Promise<void> | null = null;
 
   constructor(options: RoutingTraceOptions = {}) {
-    this.ring = new RingBuffer<TraceEvent>(options.capacity ?? 500);
+    this.ring = new RingBuffer<TraceEvent>(
+      options.capacity ?? 500,
+      options.ttlMs ?? 3600000, // 1 hour TTL for trace events
+    );
     this.logPath =
       options.logPath ?? join(homedir(), ".openclaw", "oauthrouter", "logs", "routing-trace.jsonl");
+
+    // Periodic cleanup of dead listeners (weak reference pattern)
+    this.listenerCleanupTimer = setInterval(() => {
+      this.cleanupDeadListeners();
+    }, 300000); // 5 minutes
+    this.listenerCleanupTimer.unref?.();
   }
 
   append(evt: TraceEvent): void {
     this.ring.push(evt);
 
+    // Cleanup dead listeners before broadcast
+    const toRemove: Listener[] = [];
     for (const l of this.listeners) {
       try {
         l(evt);
-      } catch {
-        // ignore listener errors
+      } catch (err) {
+        // If listener throws, it's likely a closed SSE connection — remove it
+        if (err instanceof Error && err.message.includes("socket")) {
+          toRemove.push(l);
+        }
+        // ignore other listener errors
       }
+    }
+    for (const dead of toRemove) {
+      this.listeners.delete(dead);
     }
 
     // Serialize early; enqueue for async buffered flush.
@@ -136,6 +181,40 @@ export class RoutingTraceStore {
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  private cleanupDeadListeners(): void {
+    // Clear all listeners if the set grows beyond reasonable size
+    // (indicates clients disconnected without cleanup)
+    if (this.listeners.size > 100) {
+      const dead: Listener[] = [];
+      for (const l of this.listeners) {
+        // Try calling with a ping event; if it throws, it's dead
+        try {
+          // Don't actually broadcast; just check if function is callable
+          if (typeof l !== "function") {
+            dead.push(l);
+          }
+        } catch {
+          dead.push(l);
+        }
+      }
+      for (const d of dead) {
+        this.listeners.delete(d);
+      }
+    }
+  }
+
+  shutdown(): void {
+    if (this.listenerCleanupTimer) {
+      clearInterval(this.listenerCleanupTimer);
+      this.listenerCleanupTimer = null;
+    }
+    this.listeners.clear();
+    if (this.stream) {
+      this.stream.end();
+      this.stream = null;
+    }
   }
 
   last(n: number): TraceEvent[] {

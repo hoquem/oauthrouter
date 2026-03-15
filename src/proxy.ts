@@ -52,6 +52,7 @@ import { FALLBACK_MODELS, canonicalModelForProviderTier } from "./fallback-confi
 import type { RetryConfig } from "./retry.js";
 import { fetchWithRetry } from "./retry.js";
 import { createCodexSseToChatCompletionsMapper } from "./codex-sse-mapper.js";
+import { countChatTokens } from "./tokenizer.js";
 
 const DEFAULT_PORT = 8402;
 const DEFAULT_REQUEST_TIMEOUT_MS = 180_000;
@@ -795,15 +796,16 @@ type ParsedBody = {
 };
 
 function estimateInputTokensFromBody(body: Buffer, parsed?: ParsedBody): number {
-  // Best-effort: concatenate message contents if present; otherwise use raw bytes.
+  // Use accurate tiktoken-based counting when messages are present
   try {
     const msgs = parsed?.messages;
     if (Array.isArray(msgs) && msgs.length > 0) {
-      const text = msgs.map((m) => (typeof m?.content === "string" ? m.content : "")).join(" ");
-      return Math.ceil(text.length / 4);
+      // Use model from parsed body if available, otherwise default to gpt-4
+      const model = typeof parsed?.model === "string" ? parsed.model : "gpt-4";
+      return countChatTokens(msgs as Array<{ role: string; content: string | unknown }>, model);
     }
   } catch {
-    // ignore
+    // Fallback to naive estimation on error
   }
   return Math.ceil(body.length / 4);
 }

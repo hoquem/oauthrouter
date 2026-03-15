@@ -9,6 +9,7 @@
 import type { Tier, RoutingDecision, RoutingConfig } from "./types.js";
 import { classifyByRules } from "./rules.js";
 import { selectModel, type ModelPricing } from "./selector.js";
+import { countTokens } from "../tokenizer.js";
 
 export type RouterOptions = {
   config: RoutingConfig;
@@ -33,9 +34,9 @@ export function route(
 ): RoutingDecision {
   const { config, modelPricing } = options;
 
-  // Estimate input tokens (~4 chars per token)
+  // Use accurate token counting via tiktoken
   const fullText = `${systemPrompt ?? ""} ${prompt}`;
-  const estimatedTokens = Math.ceil(fullText.length / 4);
+  const estimatedTokens = countTokens(fullText, "gpt-4");
 
   // --- Override: large context → force COMPLEX ---
   if (estimatedTokens > config.overrides.maxTokensForceComplex) {
