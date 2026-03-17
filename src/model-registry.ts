@@ -11,7 +11,7 @@
  *  - openai-codex/* models route to chatgpt.com Codex backend.
  */
 
-export type ProviderId = "openai" | "anthropic" | "openai-codex" | "deepseek";
+export type ProviderId = "openai" | "anthropic" | "openai-codex" | "deepseek" | "google";
 
 export function resolveProviderForModelId(modelId: string): ProviderId | null {
   const m = modelId.trim();

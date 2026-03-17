@@ -54,6 +54,11 @@ export {
 // Internal mappers (exported for unit tests).
 export { createCodexSseToChatCompletionsMapper } from "./codex-sse-mapper.js";
 export { normalizeDeepSeekChatCompletionsRequest, toDeepSeekModelId } from "./adapters/deepseek.js";
+export { normalizeGoogleChatCompletionsRequest } from "./adapters/google.js";
+export {
+  cleanSchemaForGemini,
+  GEMINI_UNSUPPORTED_SCHEMA_KEYWORDS,
+} from "./adapters/google-schema-cleaner.js";
 export { ProviderHealthManager, tierFromModelId } from "./provider-health.js";
 
 // Adapter exports (for unit tests).
