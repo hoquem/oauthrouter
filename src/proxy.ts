@@ -884,7 +884,16 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
     throw new Error("oauthrouter: startProxy() requires apiBase (or options.providers)");
   }
 
-  const authToken = options.authToken ?? randomBytes(32).toString("base64url");
+  const generatedToken = randomBytes(32).toString("base64url");
+  const authTokenProvided = typeof options.authToken === "string" && options.authToken.length > 0;
+  const authToken = options.authToken ?? generatedToken;
+  if (!authTokenProvided) {
+    console.warn(
+      `[oauthrouter] WARNING: no authToken in config — generated a random token that will change on restart.\n` +
+        `  To fix: add "authToken": "<stable-secret>" to your config and set OAUTHROUTER_LOCAL_TOKEN to match.\n` +
+        `  Generated token (this session only): ${authToken}`,
+    );
+  }
   const budgetTracker = new DailyBudgetTracker();
   const health =
     options.providerHealth?.enabled && options.providers
