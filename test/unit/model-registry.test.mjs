@@ -20,8 +20,12 @@ test("resolves deepseek/ prefix", () => {
   assert.equal(resolveProviderForModelId("deepseek/deepseek-chat"), "deepseek");
 });
 
+test("resolves google/ prefix", () => {
+  assert.equal(resolveProviderForModelId("google/gemini-2.5-pro"), "google");
+});
+
 test("returns null for unknown prefix", () => {
-  assert.equal(resolveProviderForModelId("google/gemini-2"), null);
+  assert.equal(resolveProviderForModelId("mistral/mixtral-8x7b"), null);
 });
 
 test("returns null for unprefixed model", () => {

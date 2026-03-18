@@ -37,6 +37,7 @@ export {
   canonicalModelForProviderTier,
   ANTHROPIC_TO_CODEX_FALLBACK_MODEL_MAP,
   ANTHROPIC_TO_DEEPSEEK_FALLBACK_MODEL_MAP,
+  ANTHROPIC_TO_GOOGLE_FALLBACK_MODEL_MAP,
   buildDefaultRateLimitFallbackChain,
 } from "./fallback-config.js";
 export {
@@ -68,6 +69,7 @@ export type {
   AnthropicMessagesResponse,
 } from "./adapters/anthropic.js";
 export { toOpenAiModelId, normalizeOpenAiChatCompletionsRequest } from "./adapters/openai.js";
+export { toGoogleModelId, normalizeGoogleChatCompletionsRequest } from "./adapters/google.js";
 export {
   toOpenAICodexModelId,
   extractChatGptAccountIdFromJwt,
