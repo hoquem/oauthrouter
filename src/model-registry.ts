@@ -11,7 +11,7 @@
  *  - openai-codex/* models route to chatgpt.com Codex backend.
  */
 
-export type ProviderId = "openai" | "anthropic" | "openai-codex" | "deepseek";
+export type ProviderId = "openai" | "anthropic" | "openai-codex" | "deepseek" | "google";
 
 export function resolveProviderForModelId(modelId: string): ProviderId | null {
   const m = modelId.trim();
@@ -19,6 +19,7 @@ export function resolveProviderForModelId(modelId: string): ProviderId | null {
   if (m.startsWith("openai/")) return "openai";
   if (m.startsWith("anthropic/")) return "anthropic";
   if (m.startsWith("deepseek/")) return "deepseek";
+  if (m.startsWith("google/")) return "google";
   return null;
 }
 

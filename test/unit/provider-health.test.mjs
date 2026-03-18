@@ -19,6 +19,9 @@ test("tierFromModelId maps known families", () => {
   assert.equal(tierFromModelId("anthropic/claude-opus-4-6"), "COMPLEX");
   assert.equal(tierFromModelId("deepseek/deepseek-reasoner"), "REASONING");
   assert.equal(tierFromModelId("openai-codex/gpt-5.2"), "MEDIUM");
+  assert.equal(tierFromModelId("google/gemini-2.5-flash"), "SIMPLE");
+  assert.equal(tierFromModelId("google/gemini-2.5-pro"), "MEDIUM");
+  assert.equal(tierFromModelId("google/gemini-3-pro-preview"), "MEDIUM");
 });
 
 test("ProviderHealthManager records cooldown on 429 and persists", async () => {
