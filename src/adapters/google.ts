@@ -14,6 +14,12 @@ export function toGoogleModelId(routerModelId: string): string {
   return routerModelId;
 }
 
+/**
+ * Fields that Google's Gemini OpenAI-compat endpoint does NOT accept.
+ * Sending any of these causes a 400 "Unknown name ... Cannot find field."
+ */
+const GOOGLE_UNSUPPORTED_FIELDS = new Set(["store", "parallel_tool_calls", "reasoning_details"]);
+
 export function normalizeGoogleChatCompletionsRequest(
   req: OpenAIChatCompletionsRequest,
 ): OpenAIChatCompletionsRequest {
@@ -25,6 +31,13 @@ export function normalizeGoogleChatCompletionsRequest(
     ...req,
     model: toGoogleModelId(model),
   };
+
+  // Strip fields that Google rejects as unknown.
+  for (const field of GOOGLE_UNSUPPORTED_FIELDS) {
+    if (field in out) {
+      delete (out as Record<string, unknown>)[field];
+    }
+  }
 
   return out;
 }
