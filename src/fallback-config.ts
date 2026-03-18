@@ -31,6 +31,12 @@ export const FALLBACK_MODELS = {
     COMPLEX: "deepseek/deepseek-reasoner",
     REASONING: "deepseek/deepseek-reasoner",
   },
+  google: {
+    SIMPLE: "google/gemini-2.5-flash",
+    MEDIUM: "google/gemini-2.5-pro",
+    COMPLEX: "google/gemini-2.5-pro",
+    REASONING: "google/gemini-2.5-pro",
+  },
 } as const;
 
 export function canonicalModelForProviderTier(
@@ -64,12 +70,32 @@ export const ANTHROPIC_TO_DEEPSEEK_FALLBACK_MODEL_MAP: Record<string, string> = 
   "anthropic/claude-opus-4-5": FALLBACK_MODELS.deepseek.REASONING,
 };
 
-export function buildDefaultRateLimitFallbackChain(hasDeepSeek: boolean): Array<{
+export const ANTHROPIC_TO_GOOGLE_FALLBACK_MODEL_MAP: Record<string, string> = {
+  "anthropic/claude-haiku-4-5": FALLBACK_MODELS.google.SIMPLE,
+  "anthropic/claude-sonnet-4-5": FALLBACK_MODELS.google.MEDIUM,
+  "anthropic/claude-sonnet-4-6": FALLBACK_MODELS.google.MEDIUM,
+  "anthropic/claude-opus-4-6": FALLBACK_MODELS.google.COMPLEX,
+  "anthropic/claude-opus-4-5": FALLBACK_MODELS.google.COMPLEX,
+};
+
+export function buildDefaultRateLimitFallbackChain(
+  hasDeepSeek: boolean,
+  hasGoogle: boolean,
+): Array<{
   provider: ProviderId;
   modelMap?: Record<string, string>;
   defaultModel?: string;
 }> {
   return [
+    ...(hasGoogle
+      ? [
+          {
+            provider: "google" as const,
+            modelMap: ANTHROPIC_TO_GOOGLE_FALLBACK_MODEL_MAP,
+            defaultModel: FALLBACK_MODELS.google.SIMPLE,
+          },
+        ]
+      : []),
     {
       provider: "openai-codex",
       modelMap: ANTHROPIC_TO_CODEX_FALLBACK_MODEL_MAP,

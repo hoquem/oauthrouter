@@ -62,6 +62,16 @@ function resolveDeepSeekApiKey() {
   return typeof t === "string" && t.trim() ? t.trim() : "";
 }
 
+function resolveGoogleApiKey() {
+  // Prefer process env so operators can override without touching openclaw.json.
+  if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim()) {
+    return process.env.GOOGLE_API_KEY.trim();
+  }
+  const cfg = readOpenClawJson();
+  const t = cfg?.env?.vars?.GOOGLE_API_KEY;
+  return typeof t === "string" && t.trim() ? t.trim() : "";
+}
+
 async function main() {
   const authToken = resolveLocalProxyToken();
   if (!authToken) {
@@ -73,10 +83,13 @@ async function main() {
   const deepseekKey = resolveDeepSeekApiKey();
   const hasDeepSeek = Boolean(deepseekKey);
 
+  const googleKey = resolveGoogleApiKey();
+  const hasGoogle = Boolean(googleKey);
+
   const anthropic = getAnthropicAuthHeader();
 
   // Single-source fallback chain config lives in src/fallback-config.ts (exported via dist/index.js).
-  const chain = buildDefaultRateLimitFallbackChain(hasDeepSeek);
+  const chain = buildDefaultRateLimitFallbackChain(hasDeepSeek, hasGoogle);
 
   const proxy = await startProxy({
     port: Number(process.env.OAUTHROUTER_PORT || "8402"),
@@ -103,6 +116,14 @@ async function main() {
       "openai-codex": {
         apiBase: "https://chatgpt.com",
       },
+      ...(hasGoogle
+        ? {
+            google: {
+              apiBase: "https://generativelanguage.googleapis.com/v1beta/openai",
+              authHeader: `Bearer ${googleKey}`,
+            },
+          }
+        : {}),
       ...(hasDeepSeek
         ? {
             deepseek: {
@@ -117,7 +138,7 @@ async function main() {
     rateLimitFallback: {
       enabled: true,
       // Keep this conservative; add providers as we gain confidence.
-      fromProviders: ["anthropic", "openai-codex"],
+      fromProviders: ["anthropic", "openai-codex", "google"],
       onStatusCodes: [429, 529],
       chain,
     },
@@ -134,6 +155,9 @@ async function main() {
   console.log(
     `OAUTHROUTER_DEBUG_DASHBOARD ${proxy.baseUrl}/debug/dashboard?token=$OAUTHROUTER_LOCAL_TOKEN`,
   );
+  if (!hasGoogle) {
+    console.log("OAUTHROUTER_NOTE Google disabled (missing GOOGLE_API_KEY)");
+  }
   if (!hasDeepSeek) {
     console.log("OAUTHROUTER_NOTE DeepSeek disabled (missing DEEPSEEK_API_KEY)");
   }
