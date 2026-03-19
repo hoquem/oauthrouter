@@ -134,6 +134,40 @@ export function toAnthropicModelId(openAiModel: string): string {
   return raw.replace(/\b(claude-(?:haiku|sonnet|opus)-4)\.5\b/g, "$1-5");
 }
 
+/**
+ * Strip JSON Schema keywords that the Anthropic Messages API rejects.
+ * Ported from OpenClaw's clean-for-gemini logic (PR #12 equivalent for Anthropic).
+ *
+ * Anthropic's tool `input_schema` doesn't accept:
+ * - `patternProperties`
+ * - `additionalProperties`
+ *
+ * These are valid JSON Schema but cause 400 "invalid_request_error" when sent
+ * to the Anthropic API (both direct and via Claude Max OAuth).
+ */
+const REJECTED_SCHEMA_KEYS = new Set(["patternProperties", "additionalProperties"]);
+
+function cleanToolSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(schema)) {
+    if (REJECTED_SCHEMA_KEYS.has(k)) continue;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      out[k] = cleanToolSchema(v as Record<string, unknown>);
+    } else if (Array.isArray(v)) {
+      out[k] = v.map((item) =>
+        item && typeof item === "object" && !Array.isArray(item)
+          ? cleanToolSchema(item as Record<string, unknown>)
+          : item,
+      );
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 export function buildAnthropicMessagesRequestFromOpenAI(
   req: OpenAIChatCompletionsRequest,
 ): AnthropicMessagesRequest {
@@ -279,7 +313,9 @@ export function buildAnthropicMessagesRequestFromOpenAI(
         .map((t) => ({
           name: t.function.name,
           ...(t.function.description ? { description: t.function.description } : {}),
-          input_schema: t.function.parameters ?? { type: "object", properties: {} },
+          input_schema: cleanToolSchema(
+            t.function.parameters ?? { type: "object", properties: {} },
+          ),
         }));
 
       if (typeof toolChoice === "string") {

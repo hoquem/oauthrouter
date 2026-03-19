@@ -34,6 +34,7 @@ import {
   toOpenAICodexModelId,
 } from "./adapters/openai-codex.js";
 import { normalizeDeepSeekChatCompletionsRequest } from "./adapters/deepseek.js";
+import { normalizeGoogleChatCompletionsRequest } from "./adapters/google.js";
 import { ProviderHealthManager, type ProviderTier, tierFromModelId } from "./provider-health.js";
 import { resolveProviderForModelId, isAutoModelId, type ProviderId } from "./model-registry.js";
 import { route, DEFAULT_ROUTING_CONFIG } from "./router/index.js";
@@ -46,6 +47,7 @@ import { FALLBACK_MODELS, canonicalModelForProviderTier } from "./fallback-confi
 import type { RetryConfig } from "./retry.js";
 import { fetchWithRetry } from "./retry.js";
 import { createCodexSseToChatCompletionsMapper } from "./codex-sse-mapper.js";
+import { getClaudeOAuthToken, isClaudeOAuthAutoRefresh } from "./claude-oauth-refresh.js";
 
 const DEFAULT_PORT = 8402;
 const DEFAULT_REQUEST_TIMEOUT_MS = 180_000;
@@ -657,7 +659,20 @@ async function buildUpstreamHeadersForProvider(
   }
 
   applyUpstreamHeaderOverrides(headers, options);
-  applyProviderHeaderOverrides(headers, upstreamConfig);
+
+  // Resolve Claude OAuth auto-refresh before applying provider headers.
+  let resolvedUpstreamConfig = upstreamConfig;
+  if (
+    provider === "anthropic" &&
+    upstreamConfig &&
+    isClaudeOAuthAutoRefresh(upstreamConfig.authHeader)
+  ) {
+    const token = await getClaudeOAuthToken();
+    if (token) {
+      resolvedUpstreamConfig = { ...upstreamConfig, authHeader: `Bearer ${token}` };
+    }
+  }
+  applyProviderHeaderOverrides(headers, resolvedUpstreamConfig);
 
   if (!headers["content-type"]) headers["content-type"] = "application/json";
 
@@ -913,7 +928,20 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   ): Promise<Record<string, string>> {
     const headers: Record<string, string> = {};
     applyUpstreamHeaderOverrides(headers, options);
-    applyProviderHeaderOverrides(headers, upstreamConfig);
+
+    // Resolve Claude OAuth auto-refresh before applying provider headers.
+    let resolvedConfig = upstreamConfig;
+    if (
+      provider === "anthropic" &&
+      upstreamConfig &&
+      isClaudeOAuthAutoRefresh(upstreamConfig.authHeader)
+    ) {
+      const token = await getClaudeOAuthToken();
+      if (token) {
+        resolvedConfig = { ...upstreamConfig, authHeader: `Bearer ${token}` };
+      }
+    }
+    applyProviderHeaderOverrides(headers, resolvedConfig);
     if (!headers["content-type"]) headers["content-type"] = "application/json";
 
     if (provider === "openai-codex") {
@@ -1005,6 +1033,13 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
         max_tokens: 1,
       } as OpenAIChatCompletionsRequest;
       body = JSON.stringify(normalizeOpenAiChatCompletionsRequest(oa));
+    } else if (provider === "google") {
+      const oa = {
+        model: modelId,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+      } as OpenAIChatCompletionsRequest;
+      body = JSON.stringify(normalizeGoogleChatCompletionsRequest(oa));
     } else {
       // Unknown provider, skip.
       return;
@@ -1853,6 +1888,13 @@ async function proxyRequest(
     upstreamBody = Buffer.from(JSON.stringify(normalized));
   }
 
+  if (provider === "google" && isChatCompletions && body.length > 0) {
+    const openAiReq = JSON.parse(body.toString()) as OpenAIChatCompletionsRequest;
+    if (typeof modelId === "string" && modelId.trim()) openAiReq.model = modelId;
+    const normalized = normalizeGoogleChatCompletionsRequest(openAiReq);
+    upstreamBody = Buffer.from(JSON.stringify(normalized));
+  }
+
   // openai-codex (chatgpt.com) adapter: OpenAI /v1/responses passthrough -> Codex responses
   if (provider === "openai-codex" && isResponses) {
     if (body.length === 0) throw new Error("Empty request body");
@@ -2513,7 +2555,9 @@ async function proxyRequest(
               ? normalizeDeepSeekChatCompletionsRequest(openAiReq)
               : toProvider === "openai"
                 ? normalizeOpenAiChatCompletionsRequest(openAiReq)
-                : openAiReq;
+                : toProvider === "google"
+                  ? normalizeGoogleChatCompletionsRequest(openAiReq)
+                  : openAiReq;
           fbBody = Buffer.from(JSON.stringify(normalized));
         }
 
