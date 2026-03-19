@@ -47,6 +47,7 @@ import { FALLBACK_MODELS, canonicalModelForProviderTier } from "./fallback-confi
 import type { RetryConfig } from "./retry.js";
 import { fetchWithRetry } from "./retry.js";
 import { createCodexSseToChatCompletionsMapper } from "./codex-sse-mapper.js";
+import { getClaudeOAuthToken, isClaudeOAuthAutoRefresh } from "./claude-oauth-refresh.js";
 
 const DEFAULT_PORT = 8402;
 const DEFAULT_REQUEST_TIMEOUT_MS = 180_000;
@@ -658,7 +659,20 @@ async function buildUpstreamHeadersForProvider(
   }
 
   applyUpstreamHeaderOverrides(headers, options);
-  applyProviderHeaderOverrides(headers, upstreamConfig);
+
+  // Resolve Claude OAuth auto-refresh before applying provider headers.
+  let resolvedUpstreamConfig = upstreamConfig;
+  if (
+    provider === "anthropic" &&
+    upstreamConfig &&
+    isClaudeOAuthAutoRefresh(upstreamConfig.authHeader)
+  ) {
+    const token = await getClaudeOAuthToken();
+    if (token) {
+      resolvedUpstreamConfig = { ...upstreamConfig, authHeader: `Bearer ${token}` };
+    }
+  }
+  applyProviderHeaderOverrides(headers, resolvedUpstreamConfig);
 
   if (!headers["content-type"]) headers["content-type"] = "application/json";
 
@@ -914,7 +928,20 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   ): Promise<Record<string, string>> {
     const headers: Record<string, string> = {};
     applyUpstreamHeaderOverrides(headers, options);
-    applyProviderHeaderOverrides(headers, upstreamConfig);
+
+    // Resolve Claude OAuth auto-refresh before applying provider headers.
+    let resolvedConfig = upstreamConfig;
+    if (
+      provider === "anthropic" &&
+      upstreamConfig &&
+      isClaudeOAuthAutoRefresh(upstreamConfig.authHeader)
+    ) {
+      const token = await getClaudeOAuthToken();
+      if (token) {
+        resolvedConfig = { ...upstreamConfig, authHeader: `Bearer ${token}` };
+      }
+    }
+    applyProviderHeaderOverrides(headers, resolvedConfig);
     if (!headers["content-type"]) headers["content-type"] = "application/json";
 
     if (provider === "openai-codex") {
