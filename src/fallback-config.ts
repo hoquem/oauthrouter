@@ -33,7 +33,7 @@ export const FALLBACK_MODELS = {
   },
   google: {
     SIMPLE: "google/gemini-2.5-flash",
-    MEDIUM: "google/gemini-2.5-pro",
+    MEDIUM: "google/gemini-2.5-flash",
     COMPLEX: "google/gemini-2.5-pro",
     REASONING: "google/gemini-2.5-pro",
   },

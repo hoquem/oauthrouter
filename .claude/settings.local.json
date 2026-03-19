@@ -8,6 +8,18 @@
       "Bash(git checkout:*)",
       "Bash(git stash:*)",
       "Bash(git rm:*)"
+      "WebSearch",
+      "Bash(npx --no-install tsup)",
+      "Bash(npm install:*)",
+      "Bash(npx tsup:*)",
+      "Bash(npm run:*)",
+      "Bash(git -C /Users/mahmud/projects/oauthrouter status)",
+      "Bash(git -C /Users/mahmud/projects/oauthrouter diff)",
+      "Bash(git -C /Users/mahmud/projects/oauthrouter log --oneline -5)",
+      "Bash(git -C /Users/mahmud/projects/oauthrouter remote -v)",
+      "Bash(git -C /Users/mahmud/projects/oauthrouter checkout -b feat/deepseek-gemini-routing)",
+      "Bash(git -C /Users/mahmud/projects/oauthrouter add src/fallback-config.ts src/model-registry.ts src/router/config.ts test/unit/fallback-config.test.mjs test/unit/model-registry.test.mjs test/unit/deepseek-gemini-routing.test.mjs)",
+      "Bash(git commit:*)"
     ]
   }
 }

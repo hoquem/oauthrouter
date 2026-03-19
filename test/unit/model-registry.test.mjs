@@ -24,8 +24,12 @@ test("resolves google/ prefix", () => {
   assert.equal(resolveProviderForModelId("google/gemini-2.5-pro"), "google");
 });
 
+test("resolves moonshot/ prefix", () => {
+  assert.equal(resolveProviderForModelId("moonshot/kimi-k2.5"), "moonshot");
+});
+
 test("returns null for unknown prefix", () => {
-  assert.equal(resolveProviderForModelId("mistral/mixtral-8x7b"), null);
+  assert.equal(resolveProviderForModelId("unknown/some-model"), null);
 });
 
 test("returns null for unprefixed model", () => {

@@ -447,21 +447,20 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
 
   tiers: {
     SIMPLE: {
-      primary: "anthropic/claude-haiku-4-5",
-      // Prefer the smaller Codex model for SIMPLE to control cost and verbosity.
-      fallback: [FALLBACK_MODELS["openai-codex"].SIMPLE],
+      primary: "deepseek/deepseek-chat",
+      fallback: [FALLBACK_MODELS.google.SIMPLE],
     },
     MEDIUM: {
-      primary: "openai-codex/gpt-5.2-codex",
-      fallback: ["anthropic/claude-sonnet-4-6", FALLBACK_MODELS["openai-codex"].MEDIUM],
+      primary: "deepseek/deepseek-chat",
+      fallback: [FALLBACK_MODELS.google.MEDIUM],
     },
     COMPLEX: {
-      primary: "anthropic/claude-sonnet-4-6",
-      fallback: ["anthropic/claude-opus-4-5", FALLBACK_MODELS["openai-codex"].COMPLEX],
+      primary: "google/gemini-2.5-pro",
+      fallback: [FALLBACK_MODELS.deepseek.COMPLEX],
     },
     REASONING: {
-      primary: "anthropic/claude-opus-4-6",
-      fallback: ["anthropic/claude-opus-4-5", FALLBACK_MODELS["openai-codex"].REASONING],
+      primary: "google/gemini-2.5-pro",
+      fallback: [FALLBACK_MODELS.deepseek.REASONING],
     },
   },
 

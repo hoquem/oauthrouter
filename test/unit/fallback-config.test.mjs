@@ -27,6 +27,11 @@ test("returns Google model for SIMPLE tier", () => {
   assert.ok(model.includes("gemini"), "should be a Gemini model");
 });
 
+test("returns null for unknown provider", () => {
+  const model = canonicalModelForProviderTier("unknown-provider", "SIMPLE");
+  assert.equal(model, null);
+});
+
 // ─── Fallback model maps ───
 
 test("Anthropic to Codex fallback map has entries", () => {
