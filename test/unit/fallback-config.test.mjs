@@ -20,8 +20,14 @@ test("returns Codex model for MEDIUM tier", () => {
   assert.ok(model, "should return a model");
 });
 
-test("returns null for unknown provider", () => {
+test("returns Google model for SIMPLE tier", () => {
   const model = canonicalModelForProviderTier("google", "SIMPLE");
+  assert.ok(model, "should return a model");
+  assert.ok(model.includes("gemini"), "should be a Gemini model");
+});
+
+test("returns null for unknown provider", () => {
+  const model = canonicalModelForProviderTier("unknown-provider", "SIMPLE");
   assert.equal(model, null);
 });
 

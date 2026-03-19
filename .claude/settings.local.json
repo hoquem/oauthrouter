@@ -1,0 +1,5 @@
+{
+  "permissions": {
+    "allow": ["Bash(git -C /Users/mahmud/projects/oauthrouter log --oneline -3)"]
+  }
+}

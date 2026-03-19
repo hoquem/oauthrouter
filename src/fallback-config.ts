@@ -31,6 +31,12 @@ export const FALLBACK_MODELS = {
     COMPLEX: "deepseek/deepseek-reasoner",
     REASONING: "deepseek/deepseek-reasoner",
   },
+  google: {
+    SIMPLE: "google/gemini-2.5-flash",
+    MEDIUM: "google/gemini-2.5-flash",
+    COMPLEX: "google/gemini-2.5-pro",
+    REASONING: "google/gemini-2.5-pro",
+  },
 } as const;
 
 export function canonicalModelForProviderTier(
